@@ -76,6 +76,25 @@ export function selectedVisualClips(engine: TimelineEngine): LocatedClip[] {
   );
 }
 
+/**
+ * Swaps a clip's media but leaves its position and trim alone. Used when the
+ * replacement is the same footage re-rendered (burned-in captions), where
+ * restoring the full source length would overlap whatever follows the clip.
+ */
+export async function swapClipMedia(
+  engine: TimelineEngine,
+  located: LocatedClip,
+  file: File,
+  kind: "video" | "image",
+): Promise<void> {
+  const asset = await importBlob(file, { name: file.name, kind });
+  engine.updateClip(located.clip.id, located.trackId, {
+    src: asset.src,
+    assetId: asset.id,
+    name: asset.name,
+  });
+}
+
 /** Point a clip at a newly imported file. Video length follows the new media. */
 export async function replaceClipFile(
   engine: TimelineEngine,
