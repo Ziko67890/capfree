@@ -1,0 +1,37 @@
+services:
+  backend:
+    build:
+      context: ./api
+    image: capfree-api
+    ports:
+      - "8000:8000"
+    environment:
+      # tiny | base | small | medium | large-v3 — bigger is slower but sharper.
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-200}
+      # Only needed for POST /tts.
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      # The ML models load on first use, so give the container room to start.
+      start_period: 90s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      args:
+        # Baked into the client bundle at build time. This URL is resolved by the
+        # browser on the host, not from inside the container.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    image: capfree-web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped

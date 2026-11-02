@@ -1,140 +1,167 @@
-# CapFree — Free Video Editor
+# CapFree
 
-A full-featured, CapCut-style video editor. Browser frontend + Python backend. Free forever — no account, no payment, no watermarks.
+**Free video editor. No watermark. No account. No ByteDance.**
 
----
-
-## Project structure
-
-```
-capfree/
-│
-├── app/                          ← FRONTEND (Next.js)
-│   ├── page.tsx                     Landing page
-│   ├── layout.tsx                   Root layout (dark theme)
-│   ├── globals.css                  Global styles + Elah editor CSS
-│   └── editor/
-│       ├── page.tsx                 Editor route
-│       ├── EditorShell.tsx          Main editor: provider + layout
-│       └── components/
-│           ├── TopBar.tsx           Header bar (logo, undo/redo, export)
-│           ├── PlaybackControls.tsx Play/pause, scrub bar, loop, timecode
-│           └── ExportModal.tsx      Export dialog (480p/720p/1080p MP4)
-│
-├── api/                          ← BACKEND (Python / FastAPI)
-│   ├── main.py                      FastAPI app, CORS, /captions endpoint
-│   ├── silence.py                   /silence/detect, /silence/remove
-│   ├── fillers.py                   /fillers/detect, /fillers/remove
-│   ├── removebg.py                  /removebg, /removebg/batch
-│   ├── beats.py                     /beats, /beat-sync
-│   ├── tts.py                       /tts (ElevenLabs)
-│   ├── vocals.py                    /vocals/isolate, /vocals/music
-│   ├── upscale.py                   /upscale (Real-ESRGAN)
-│   ├── tracking.py                  /track (OpenCV)
-│   ├── requirements.txt             Python dependencies
-│   └── Dockerfile                   Production container (Railway / Render)
-│
-├── package.json                  ← Frontend dependencies
-├── next.config.ts
-├── tsconfig.json
-└── README.md                     ← You are here
-```
+A CapCut-style video editor that runs in your browser, with a Python backend for the
+AI-heavy work. Everything runs on hardware you control.
 
 ---
 
-## Frontend
-
-Built with **Next.js 16**, TypeScript, Tailwind CSS, and the [@elah/editor](https://www.elah.dev) SDK (Apache-2.0).
-
-### Features
-
-- Multi-track timeline (video + audio) with drag-and-drop
-- Real-time WebGL2 GPU preview
-- Media library: import videos, images, audio by drag-and-drop
-- Text & shape overlays via the Elements panel
-- In-browser MP4 export (WebCodecs, H.264 + AAC) — 480p / 720p / 1080p
-- No watermark, no login, no payment
-
-### Run the frontend
+## Quick start
 
 ```bash
+docker compose up --build
+```
+
+That builds and starts both services:
+
+| Service    | URL                     | What it is                        |
+|------------|-------------------------|-----------------------------------|
+| Editor     | http://localhost:3000   | Next.js frontend                  |
+| API        | http://localhost:8000   | FastAPI backend (`/docs` for Swagger) |
+
+The first build is slow — the backend image installs Whisper, Demucs, Real-ESRGAN and
+OpenCV, and bakes the background-removal models in so the first request isn't slow.
+Later builds are cached.
+
+Open http://localhost:3000 and hit **Launch Editor**.
+
+---
+
+## Your footage never leaves your machine
+
+There is no upload step and no cloud account. Your clips are decoded in the browser with
+WebCodecs, and the AI features post to the FastAPI service running in a container next to
+it — on your own machine, on localhost. Nothing is sent anywhere else, and there is nothing
+to opt out of.
+
+---
+
+## Features
+
+| Feature                 | What it does                                                        | Status |
+|-------------------------|---------------------------------------------------------------------|--------|
+| **Auto Captions**       | Transcribes speech and drops timed caption clips onto the timeline   | Wired  |
+| **Vocal Split**         | Separates vocals from backing music into two editable tracks         | Wired  |
+| **Filler Remover**      | Finds every *um*, *uh* and *like*, then cuts the ones you tick       | Wired  |
+| **Beat Sync**           | Detects tempo and lands your cuts on the beat                        | Wired  |
+| **Background Removal**  | Strips the background off a shot for a transparent cut-out           | Wired  |
+| **Transcript Editing**  | Edit the words, the video follows                                    | UI only |
+
+Also in the editor: multi-track timeline, real-time preview, text and stickers, filters,
+colour grading, per-clip effects, transitions, translation, and in-browser MP4 export
+(H.264 + AAC, 480p/720p/1080p).
+
+"Wired" means the panel calls the backend end to end. "UI only" means the panel is built
+but not yet connected — the Reframe, Highlights and AI Avatar panels are in the same state
+and are labelled as such in the app.
+
+---
+
+## Tech stack
+
+**Frontend** — Next.js 16, React 19, TypeScript, Tailwind CSS 4, and the
+[@elah/editor](https://www.elah.dev) engine (Apache-2.0) for the timeline and preview.
+
+**Backend** — Python with FastAPI and FFmpeg, plus:
+
+| Tool             | Used for                         |
+|------------------|----------------------------------|
+| **Whisper**      | Transcription, captions, fillers |
+| **Demucs**       | Vocal / music separation         |
+| **librosa**      | Beat and tempo detection         |
+| **Real-ESRGAN**  | Upscaling                        |
+| **OpenCV**       | Motion tracking                  |
+| **rembg**        | Background removal               |
+
+---
+
+## Running without Docker
+
+Two terminals.
+
+```bash
+# frontend
 npm install
-npm run dev -- --port 4721
-# → http://localhost:4721
+npm run dev
+# → http://localhost:3000
 ```
 
----
-
-## Backend
-
-Built with **FastAPI** + **FFmpeg** + open-source ML models.
-
-### API endpoints
-
-| Endpoint             | Method | What it does                                    |
-|----------------------|--------|-------------------------------------------------|
-| `GET  /health`       | GET    | Health check                                    |
-| `POST /captions`     | POST   | Transcribe audio → captions (JSON / SRT / VTT)  |
-| `POST /silence/detect` | POST | Find silent segments in a video                 |
-| `POST /silence/remove` | POST | Cut silent segments, return trimmed video       |
-| `POST /fillers/detect`  | POST | Find filler words (um, uh, like…)              |
-| `POST /fillers/remove`  | POST | Cut filler words, return cleaned video          |
-| `POST /removebg`     | POST   | Remove background from an image → transparent PNG |
-| `POST /removebg/batch` | POST | Batch background removal (up to 10 images)      |
-| `POST /beats`        | POST   | Detect BPM and beat timestamps from music       |
-| `POST /beat-sync`    | POST   | Sync clips to beats → rendered MP4 or JSON plan |
-| `POST /tts`          | POST   | Text-to-speech via ElevenLabs → streamed MP3    |
-| `POST /vocals/isolate` | POST | Demucs vocal isolation → vocals MP3             |
-| `POST /vocals/music` | POST   | Demucs vocal isolation → accompaniment MP3      |
-| `POST /upscale`      | POST   | Real-ESRGAN upscale of an image or short video  |
-| `POST /track`        | POST   | Track an object with OpenCV → per-frame boxes   |
-
-### Run the backend locally
-
 ```bash
+# backend
 cd api
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
-# → http://localhost:8000/docs  (Swagger UI)
+# → http://localhost:8000/docs
 ```
 
-### Deploy with Docker
-
-```bash
-cd api
-docker build -t capfree-api .
-docker run -p 8000:8000 capfree-api
-```
-
-### Environment variables
-
-| Variable         | Default  | Description                            |
-|------------------|----------|----------------------------------------|
-| `WHISPER_MODEL`  | `base`   | Whisper model size (tiny/base/small/medium/large-v3) |
-| `MAX_UPLOAD_MB`  | `200`    | Maximum upload size in MB              |
-| `API_KEY`        | *(none)* | Optional API key for auth (leave unset = open) |
-| `ELEVENLABS_API_KEY` | *(none)* | Required for `POST /tts`                    |
-| `PORT`           | `8000`   | Server port (Railway sets this automatically) |
+The frontend defaults to `http://localhost:8000` when `NEXT_PUBLIC_API_URL` is unset, so
+this works with no configuration.
 
 ---
 
-## Roadmap
+## Configuration
 
-| #  | Feature                              | Tools               | Status       |
-|----|--------------------------------------|----------------------|--------------|
-| 1  | Timeline, trim, split, speed         | Elah SDK             | ✅ Partial    |
-| 2  | Auto captions with animated styles   | Whisper              | ✅ Backend    |
-| 3  | Silence and filler cutter            | Whisper + FFmpeg     | ✅ Backend    |
-| 4  | Background removal                   | rembg                | ✅ Backend    |
-| 5  | Text-to-speech                       | ElevenLabs           | ✅ Backend    |
-| 6  | Beat sync                            | librosa              | ✅ Backend    |
-| 7  | Vocal isolation / audio cleanup      | Demucs + FFmpeg      | ✅ Backend    |
-| 8  | Motion tracking                      | OpenCV               | ✅ Backend    |
-| 9  | Upscaling                            | Real-ESRGAN          | ✅ Backend    |
-| 10 | Brand kits, templates, batch mode    | n8n hooks            | ⬜ Not started |
+| Variable               | Default                 | What it does                                  |
+|------------------------|-------------------------|-----------------------------------------------|
+| `NEXT_PUBLIC_API_URL`  | `http://localhost:8000` | Where the browser sends API calls              |
+| `WHISPER_MODEL`        | `base`                  | `tiny` / `base` / `small` / `medium` / `large-v3` |
+| `MAX_UPLOAD_MB`        | `200`                   | Largest accepted upload                        |
+| `API_KEY`              | *(unset)*               | If set, requires an `x-api-key` header         |
+| `ELEVENLABS_API_KEY`   | *(unset)*               | Needed only for `POST /tts`                    |
+
+`NEXT_PUBLIC_API_URL` is inlined into the browser bundle when the frontend is **built**,
+not when it starts. In Docker it is passed as a build arg; changing it means rebuilding
+the frontend image, not just restarting it.
+
+---
+
+## API
+
+`GET /health` plus:
+
+| Endpoint                | Does                                              |
+|-------------------------|---------------------------------------------------|
+| `POST /captions`        | Transcribe audio → captions (JSON / SRT / VTT)    |
+| `POST /silence/detect`  | Find silent segments                              |
+| `POST /silence/remove`  | Cut silence, return trimmed video                 |
+| `POST /fillers/detect`  | Find filler words                                 |
+| `POST /fillers/remove`  | Cut filler words, return cleaned video            |
+| `POST /removebg`        | Background removal → transparent PNG              |
+| `POST /removebg/batch`  | Batch background removal (up to 10 images)        |
+| `POST /beats`           | Detect BPM and beat timestamps                    |
+| `POST /beat-sync`       | Sync clips to beats                               |
+| `POST /tts`             | Text-to-speech → MP3                              |
+| `POST /vocals/isolate`  | Vocals only                                       |
+| `POST /vocals/music`    | Accompaniment only                                |
+| `POST /upscale`         | Real-ESRGAN upscale                               |
+| `POST /track`           | Track an object → per-frame boxes                 |
+| `POST /translate`       | Translate text                                    |
+| `POST /subtitles/burn`  | Burn subtitles into a video                       |
+
+Full Swagger UI at http://localhost:8000/docs.
+
+---
+
+## Project layout
+
+```
+capfree/
+├── app/                  Next.js frontend
+│   ├── page.tsx            Landing page
+│   ├── layout.tsx          Root layout
+│   └── editor/             The editor: shell, panels, timeline helpers
+├── api/                  FastAPI backend (one module per capability)
+│   └── Dockerfile          Backend image
+├── Dockerfile            Frontend image
+└── docker-compose.yml    Both services
+```
 
 ---
 
 ## License
 
-Frontend engine: Apache-2.0 (Elah). Backend: your own code.
+MIT.
+
+The Elah editor engine is Apache-2.0. The ML models carry their own licences — check
+Whisper, Demucs, Real-ESRGAN and rembg before shipping commercially.
