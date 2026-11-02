@@ -1,0 +1,280 @@
+@import "tailwindcss";
+@import "@elah/editor/styles.css";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* SourcePanel draws its own Media/Elements tabs. The top toolbar owns navigation. */
+.capfree-source > div:first-child {
+  display: none;
+}
+
+.capfree-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.capfree-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.capfree-scroll::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+.capfree-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes capfree-flash {
+  0%, 100% { filter: brightness(1); }
+  40% { filter: brightness(5); }
+}
+@keyframes capfree-shutter {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  35% { filter: brightness(3) saturate(0.4); }
+}
+@keyframes capfree-burst {
+  0%, 100% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(180deg); }
+}
+@keyframes capfree-wavy {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes capfree-vhs {
+  0%, 100% { filter: blur(0) hue-rotate(0deg); transform: translateX(0); }
+  25% { filter: blur(2px) hue-rotate(20deg); transform: translateX(-2px); }
+  50% { filter: blur(0) hue-rotate(-15deg); transform: translateX(2px); }
+}
+@keyframes capfree-elastic {
+  0% { transform: scaleX(1); }
+  35% { transform: scaleX(1.3); }
+  60% { transform: scaleX(0.9); }
+  100% { transform: scaleX(1); }
+}
+@keyframes capfree-ghost {
+  0%, 100% { opacity: 1; transform: translateX(0); }
+  50% { opacity: 0.3; transform: translateX(10px); }
+}
+@keyframes capfree-blurin {
+  from { filter: blur(8px); }
+  to { filter: blur(0); }
+}
+@keyframes capfree-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+@keyframes capfree-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.15); }
+}
+@keyframes capfree-neon {
+  0%, 100% { filter: drop-shadow(0 0 2px #00d4b4); }
+  50% { filter: drop-shadow(0 0 10px #00d4b4); }
+}
+@keyframes capfree-tilt {
+  from { transform: perspective(240px) rotateY(0deg); }
+  to { transform: perspective(240px) rotateY(15deg); }
+}
+@keyframes capfree-holo {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+@keyframes capfree-cursor {
+  50% { opacity: 0; }
+}
+@keyframes capfree-tr-black {
+  0% { opacity: 1; }
+  45% { opacity: 0; background: #000; }
+  55% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes capfree-tr-white {
+  0% { opacity: 1; }
+  45%, 55% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes capfree-tr-flash {
+  0%, 100% { filter: brightness(1); }
+  40% { filter: brightness(5); }
+}
+@keyframes capfree-tr-bounce {
+  0% { transform: scale(0.4); }
+  55% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes capfree-tr-elastic {
+  0% { transform: scale(0.7) translateX(12px); }
+  40% { transform: scale(1.12) translateX(-6px); }
+  70% { transform: scale(0.96) translateX(3px); }
+  100% { transform: scale(1) translateX(0); }
+}
+
+.capfree-scan {
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.28) 0 1px, transparent 1px 3px);
+}
+.capfree-grain {
+  background-image: radial-gradient(rgb(255 255 255 / 0.18) 0.6px, transparent 0.6px);
+  background-size: 3px 3px;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+}
+.capfree-vignette {
+  background: radial-gradient(circle, transparent 42%, rgb(0 0 0 / 0.72) 100%);
+}
+.capfree-stroke {
+  -webkit-text-stroke: 2px black;
+  paint-order: stroke fill;
+}
+.capfree-stroke-thick {
+  -webkit-text-stroke: 4px black;
+  paint-order: stroke fill;
+}
+.capfree-clip-text {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.capfree-depth {
+  text-shadow: 1px 1px 0 #9aa, 2px 2px 0 #667, 3px 3px 0 #445, 4px 4px 0 #223;
+}
+.capfree-cursor::after {
+  content: "_";
+  animation: capfree-cursor 1s step-end infinite;
+}
+@keyframes capfree-eq {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+.capfree-eq {
+  transform-origin: bottom;
+  animation: capfree-eq 0.7s ease-in-out infinite;
+}
+.capfree-eq:nth-child(2) { animation-delay: 0.08s; }
+.capfree-eq:nth-child(3) { animation-delay: 0.16s; }
+.capfree-eq:nth-child(4) { animation-delay: 0.04s; }
+.capfree-eq:nth-child(5) { animation-delay: 0.2s; }
+
+.group:hover .capfree-fx-border {
+  box-shadow: inset 0 0 0 4px #fff;
+  border: 4px solid white;
+}
+.group:hover .capfree-fx-flash { animation: capfree-flash 0.3s ease; }
+.group:hover .capfree-fx-shutter { animation: capfree-shutter 0.2s ease; }
+.group:hover .capfree-fx-burst { animation: capfree-burst 0.5s ease; }
+.group:hover .capfree-fx-wavy { animation: capfree-wavy 1s ease-in-out; }
+.group:hover .capfree-fx-vhs { animation: capfree-vhs 0.45s linear; }
+.group:hover .capfree-fx-elastic { animation: capfree-elastic 0.5s ease; }
+.group:hover .capfree-fx-ghost { animation: capfree-ghost 1s ease; }
+.group:hover .capfree-fx-blur { animation: capfree-blurin 0.6s ease forwards; }
+.group:hover .capfree-fx-shake { animation: capfree-shake 0.4s ease; }
+.group:hover .capfree-fx-zoom { animation: capfree-zoom 0.5s ease forwards; }
+.group:hover .capfree-fx-mirror { transform: scaleX(-1); }
+.group:hover .capfree-fx-neon { animation: capfree-neon 0.8s ease infinite; }
+.group:hover .capfree-fx-burn { filter: sepia(0.8) brightness(1.2); }
+.group:hover .capfree-fx-chroma { filter: drop-shadow(3px 0 red) drop-shadow(-3px 0 cyan); }
+.group:hover .capfree-fx-tilt { animation: capfree-tilt 0.4s ease forwards; }
+.group:hover .capfree-fx-old { filter: grayscale(0.8) sepia(0.3); }
+.group:hover .capfree-fx-dreamy { filter: blur(1px) brightness(1.1) saturate(1.5); }
+.group:hover .capfree-fx-holo { animation: capfree-holo 2s linear infinite; }
+
+.capfree-tr-stage { perspective: 260px; }
+.capfree-tr-from, .capfree-tr-to {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.capfree-tr-from { clip-path: inset(0 50% 0 0); z-index: 1; }
+.capfree-tr-to { opacity: 1; clip-path: inset(0 0 0 50%); }
+.group:hover .capfree-tr-from { clip-path: none; }
+.group:hover .capfree-tr-to { clip-path: none; }
+.group.capfree-tr-cut:hover .capfree-tr-from { opacity: 0; }
+.group.capfree-tr-cut:hover .capfree-tr-to { opacity: 1; }
+.group.capfree-tr-dissolve:hover .capfree-tr-from { opacity: 0; transition: opacity 0.6s; }
+.group.capfree-tr-dissolve:hover .capfree-tr-to { opacity: 1; transition: opacity 0.6s; }
+.group.capfree-tr-black:hover .capfree-tr-from { animation: capfree-tr-black 0.6s ease forwards; }
+.group.capfree-tr-black:hover .capfree-tr-to { opacity: 1; transition: opacity 0.3s 0.3s; }
+.group.capfree-tr-white:hover .capfree-tr-from { animation: capfree-tr-white 0.6s ease forwards; filter: brightness(8); }
+.group.capfree-tr-white:hover .capfree-tr-to { opacity: 1; transition: opacity 0.3s 0.3s; }
+.group.capfree-tr-slide-l:hover .capfree-tr-from { transform: translateX(-100%); transition: transform 0.5s ease; }
+.group.capfree-tr-slide-l:hover .capfree-tr-to { opacity: 1; transform: translateX(0); }
+.capfree-tr-slide-l .capfree-tr-to { opacity: 1; transform: translateX(100%); }
+.group.capfree-tr-slide-r:hover .capfree-tr-from { transform: translateX(100%); transition: transform 0.5s ease; }
+.group.capfree-tr-slide-r:hover .capfree-tr-to { opacity: 1; transform: translateX(0); }
+.capfree-tr-slide-r .capfree-tr-to { opacity: 1; transform: translateX(-100%); }
+.group.capfree-tr-slide-u:hover .capfree-tr-from { transform: translateY(-100%); transition: transform 0.5s ease; }
+.group.capfree-tr-slide-u:hover .capfree-tr-to { opacity: 1; transform: translateY(0); }
+.capfree-tr-slide-u .capfree-tr-to { opacity: 1; transform: translateY(100%); }
+.group.capfree-tr-push:hover .capfree-tr-from { transform: translateX(-100%); transition: transform 0.5s ease; }
+.group.capfree-tr-push:hover .capfree-tr-to { opacity: 1; transform: translateX(0); transition: transform 0.5s ease; }
+.capfree-tr-push .capfree-tr-to { opacity: 1; transform: translateX(100%); }
+.group.capfree-tr-zoomin:hover .capfree-tr-from { transform: scale(1.3); filter: blur(6px); opacity: 0; transition: 0.5s; }
+.group.capfree-tr-zoomin:hover .capfree-tr-to { opacity: 1; transform: scale(1); }
+.group.capfree-tr-zoomout:hover .capfree-tr-from { transform: scale(0.7); opacity: 0; transition: 0.5s; }
+.group.capfree-tr-zoomout:hover .capfree-tr-to { opacity: 1; }
+.capfree-tr-zoomout .capfree-tr-to { transform: scale(1.3); }
+.group.capfree-tr-zoomout:hover .capfree-tr-to { transform: scale(1); transition: transform 0.5s; }
+.group.capfree-tr-flash:hover .capfree-tr-from { animation: capfree-tr-flash 0.4s ease; opacity: 0; }
+.group.capfree-tr-flash:hover .capfree-tr-to { opacity: 1; }
+.group.capfree-tr-spin:hover .capfree-tr-from { transform: rotateY(90deg); transition: transform 0.4s; }
+.group.capfree-tr-spin:hover .capfree-tr-to { opacity: 1; transform: rotateY(0deg); }
+.capfree-tr-spin .capfree-tr-to { transform: rotateY(-90deg); }
+.group.capfree-tr-flip:hover .capfree-tr-from { transform: rotateX(90deg); transition: transform 0.4s; }
+.group.capfree-tr-flip:hover .capfree-tr-to { opacity: 1; transform: rotateX(0deg); }
+.capfree-tr-flip .capfree-tr-to { transform: rotateX(-90deg); }
+.group.capfree-tr-wipe-l:hover .capfree-tr-to { opacity: 1; clip-path: inset(0 0 0 0); }
+.capfree-tr-wipe-l .capfree-tr-to { opacity: 1; clip-path: inset(0 100% 0 0); transition: clip-path 0.5s; }
+.group.capfree-tr-wipe-r:hover .capfree-tr-to { opacity: 1; clip-path: inset(0 0 0 0); }
+.capfree-tr-wipe-r .capfree-tr-to { opacity: 1; clip-path: inset(0 0 0 100%); transition: clip-path 0.5s; }
+.group.capfree-tr-circle:hover .capfree-tr-to { opacity: 1; clip-path: circle(150% at 50% 50%); }
+.capfree-tr-circle .capfree-tr-to { opacity: 1; clip-path: circle(0% at 50% 50%); transition: clip-path 0.6s; }
+.group.capfree-tr-glitch:hover .capfree-tr-from { transform: translateX(-6px); filter: hue-rotate(80deg); opacity: 0; }
+.group.capfree-tr-glitch:hover .capfree-tr-to { opacity: 1; transform: translateX(0); }
+.group.capfree-tr-bounce:hover .capfree-tr-from { opacity: 0; }
+.group.capfree-tr-bounce:hover .capfree-tr-to { opacity: 1; animation: capfree-tr-bounce 0.6s ease; }
+.group.capfree-tr-elastic:hover .capfree-tr-from { opacity: 0; }
+.group.capfree-tr-elastic:hover .capfree-tr-to { opacity: 1; animation: capfree-tr-elastic 0.7s ease; }
+.group.capfree-tr-shatter:hover .capfree-piece-1 { transform: translate(-18px, -14px) rotate(-12deg); opacity: 0; }
+.group.capfree-tr-shatter:hover .capfree-piece-2 { transform: translate(18px, -10px) rotate(10deg); opacity: 0; }
+.group.capfree-tr-shatter:hover .capfree-piece-3 { transform: translate(-14px, 16px) rotate(8deg); opacity: 0; }
+.group.capfree-tr-shatter:hover .capfree-piece-4 { transform: translate(16px, 14px) rotate(-8deg); opacity: 0; }
+.group.capfree-tr-shatter:hover .capfree-tr-to { opacity: 1; }
+.capfree-piece {
+  position: absolute;
+  width: 50%;
+  height: 50%;
+  object-fit: cover;
+  transition: transform 0.5s ease, opacity 0.5s ease;
+}
+.capfree-piece-1 { top: 0; left: 0; object-position: left top; }
+.capfree-piece-2 { top: 0; right: 0; object-position: right top; }
+.capfree-piece-3 { bottom: 0; left: 0; object-position: left bottom; }
+.capfree-piece-4 { bottom: 0; right: 0; object-position: right bottom; }

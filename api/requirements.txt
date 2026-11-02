@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+python-multipart
+faster-whisper
+rembg[cpu]
+pillow
+librosa
+demucs
+realesrgan
+# CSRT, KCF, and MOSSE ship in the contrib build, not in opencv-python.
+opencv-contrib-python
+deep-translator
