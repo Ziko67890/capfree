@@ -51,7 +51,7 @@ export function LeftPanel({ tab, fps, onAssetActivate }: LeftPanelProps) {
       <Pane active={tab === "filters"}><FiltersPanel /></Pane>
       <Pane active={tab === "adjustment"}><AdjustmentPanel fps={fps} /></Pane>
       <Pane active={tab === "templates"}><TemplatesPanel fps={fps} /></Pane>
-      <Pane active={tab === "avatar"}><AvatarPanel fps={fps} /></Pane>
+      <Pane active={tab === "avatar"}><AvatarPanel /></Pane>
       <Pane active={tab === "transcript"}><TranscriptPanel fps={fps} active={tab === "transcript"} /></Pane>
       <Pane active={tab === "fillers"}><FillerFixPanel fps={fps} /></Pane>
       <Pane active={tab === "vocals"}><VocalSplitPanel fps={fps} /></Pane>

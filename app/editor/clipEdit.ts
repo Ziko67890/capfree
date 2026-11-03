@@ -2,6 +2,7 @@ import { createEffect, type Effect } from "@elah/core";
 import {
   playbackStore,
   selectionStore,
+  type ActionFailureReason,
   type Clip,
   type TimelineEngine,
   type TrackKind,
@@ -246,6 +247,34 @@ export function pasteSelection(engine: TimelineEngine, frame: number): string | 
   selectionStore.getState().selectClips(ids);
   return null;
 }
+
+/** Clones each selected clip into the first free slot after itself. */
+export function duplicateSelection(engine: TimelineEngine): string | null {
+  const hits = selectedClips(engine);
+  if (hits.length === 0) return "Select a clip to duplicate.";
+  const ids: string[] = [];
+  engine.batch(() => {
+    for (const hit of hits) {
+      const after = hit.clip.startFrame + hit.clip.durationFrames;
+      const start = freeFrame(engine, hit.trackId, after, hit.clip.durationFrames);
+      const id = engine.cloneClip(hit.clip.id, hit.trackId, start);
+      if (id) ids.push(id);
+    }
+  }, "Duplicate clips");
+  if (ids.length === 0) return "Could not duplicate that clip.";
+  selectionStore.getState().selectClips(ids);
+  return null;
+}
+
+/** Why a split was refused, in words. Shared by the toolbar and the shortcut. */
+export const SPLIT_MESSAGE: Partial<Record<ActionFailureReason, string>> = {
+  "no-selection": "Select a clip to split.",
+  "multi-selection": "Select a single clip to split.",
+  "playhead-outside-clip": "Move the playhead inside the clip.",
+  "cannot-split-while-playing": "Pause playback before splitting.",
+  "clip-not-found": "That clip is no longer on the timeline.",
+  "track-locked": "This track is locked.",
+};
 
 export function deleteSelection(engine: TimelineEngine): string | null {
   const hits = selectedClips(engine);

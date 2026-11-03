@@ -88,6 +88,7 @@ export function PlaybackControls({
           min={0}
           max={Math.max(totalFrames, 1)}
           value={currentFrame}
+          aria-label="Seek"
           onChange={(e) => onSeek(Number(e.target.value))}
           className="absolute inset-0 w-full opacity-0 cursor-pointer"
         />

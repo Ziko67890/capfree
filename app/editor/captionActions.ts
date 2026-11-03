@@ -100,6 +100,29 @@ export function deleteCurrentCaptions(engine: TimelineEngine): number {
   return removed;
 }
 
+function srtStamp(seconds: number): string {
+  const safe = Math.max(0, seconds);
+  const pad = (value: number, size = 2) => String(value).padStart(size, "0");
+  const hrs = Math.floor(safe / 3600);
+  const mins = Math.floor((safe % 3600) / 60);
+  const secs = Math.floor(safe % 60);
+  const ms = Math.round((safe - Math.floor(safe)) * 1000);
+  return `${pad(hrs)}:${pad(mins)}:${pad(secs)},${pad(ms, 3)}`;
+}
+
+/** SRT for transcribed lines, timed against the source media the burn receives. */
+export function srtFromCaptions(lines: ReadonlyArray<CaptionLine>): string {
+  const blocks: string[] = [];
+  for (const line of lines) {
+    const text = line.text.trim();
+    if (!text) continue;
+    blocks.push(
+      `${blocks.length + 1}\n${srtStamp(line.start)} --> ${srtStamp(line.end)}\n${text}\n`,
+    );
+  }
+  return blocks.join("\n");
+}
+
 export function playheadFrame(): number {
   return playbackStore.getState().currentFrame;
 }

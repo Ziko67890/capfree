@@ -13,18 +13,14 @@ import {
   useTracksStore,
   ZOOM_MAX,
   ZOOM_MIN,
-  type ActionFailureReason,
 } from "@elah/editor";
-import { copySelection, deleteSelection, pasteSelection, selectedClips } from "../clipEdit";
-
-const SPLIT_MESSAGE: Partial<Record<ActionFailureReason, string>> = {
-  "no-selection": "Select a clip to split.",
-  "multi-selection": "Select a single clip to split.",
-  "playhead-outside-clip": "Move the playhead inside the clip.",
-  "cannot-split-while-playing": "Pause playback before splitting.",
-  "clip-not-found": "That clip is no longer on the timeline.",
-  "track-locked": "This track is locked.",
-};
+import {
+  copySelection,
+  deleteSelection,
+  pasteSelection,
+  selectedClips,
+  SPLIT_MESSAGE,
+} from "../clipEdit";
 
 interface TimelineBarProps {
   fps: number;
@@ -165,13 +161,13 @@ export function TimelineBar({ fps }: TimelineBarProps) {
           {open === "speed" ? (
             <label className="flex flex-col gap-1 text-[11px] text-[#c8c8ce]">
               <span className="flex justify-between">
-                Speed <span className="font-mono">{speed.toFixed(1)}x</span>
+                Speed <span className="font-mono">{speed.toFixed(2)}x</span>
               </span>
               <input
                 type="range"
-                min={0.1}
+                min={0.25}
                 max={4}
-                step={0.1}
+                step={0.05}
                 value={speed}
                 aria-label="Clip speed"
                 onChange={(event) => setSpeed(Number(event.target.value))}

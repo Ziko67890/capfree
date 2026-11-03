@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Download, Loader2 } from "lucide-react";
+import { X, Download } from "lucide-react";
 import { exportVideo, useTimelineEngine } from "@elah/editor";
 
 interface ExportModalProps {
-  fps: number;
   onClose: () => void;
 }
 
 type ExportState = "idle" | "exporting" | "done" | "error";
 
-export function ExportModal({ fps, onClose }: ExportModalProps) {
+export function ExportModal({ onClose }: ExportModalProps) {
   const [state, setState] = useState<ExportState>("idle");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");

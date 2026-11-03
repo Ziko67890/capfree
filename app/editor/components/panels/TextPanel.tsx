@@ -2,13 +2,88 @@
 
 import { useRef } from "react";
 import { createEffect } from "@elah/core";
-import { applyTextTemplate, BUILT_IN_TEXT_TEMPLATES, useTimelineEngine, type Clip } from "@elah/editor";
+import {
+  applyTextTemplate,
+  BUILT_IN_TEXT_TEMPLATES,
+  useTimelineEngine,
+  type Clip,
+  type MotionSpec,
+  type TextAnimation,
+  type TextAnimationKind,
+} from "@elah/editor";
 import { placeTimedCaption } from "../../captionActions";
-import { placeTextClip, selectedClips } from "../../clipEdit";
+import { CAPTION_FONTS } from "../../catalog";
+import { deleteSelection, placeTextClip, selectedClips } from "../../clipEdit";
+import { useSelectedClip } from "../../useSelectedClip";
 import { FONT_LIST, TEXT_PRESETS } from "../../visuals";
 import { TEXT_EFFECTS, TEXT_MOTIONS, TEXT_STYLES } from "../../library";
-import { PanelBody, PrimaryButton, QuietButton } from "../chrome";
+import { HintNote, PanelBody, PrimaryButton, QuietButton } from "../chrome";
 import { useToast } from "../toast";
+
+const TEXT_COLORS = [
+  "#ffffff",
+  "#000000",
+  "#00d4b4",
+  "#ffd166",
+  "#ef476f",
+  "#118ab2",
+  "#06d6a0",
+  "#8338ec",
+];
+
+const ANIMATIONS = [
+  { id: "none", label: "None" },
+  { id: "fade", label: "Fade" },
+  { id: "slide", label: "Slide" },
+  { id: "pop", label: "Pop" },
+] as const;
+
+type AnimationId = (typeof ANIMATIONS)[number]["id"];
+type Slot = "in" | "out";
+
+const ALIGNMENTS = ["left", "center", "right"] as const;
+const SLOTS: readonly Slot[] = ["in", "out"];
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+/** Which of the four choices the clip's current animation corresponds to. */
+function animationOf(animation: TextAnimation | undefined, slot: Slot): AnimationId {
+  const kind = slot === "in" ? animation?.in : animation?.out;
+  const motion = slot === "in" ? animation?.inMotion : animation?.outMotion;
+  if (!kind) return "none";
+  // Pop is a fade carrying a scale, so the scale is what distinguishes it.
+  if (motion?.scale !== undefined) return "pop";
+  if (kind.startsWith("slide")) return "slide";
+  return "fade";
+}
+
+/** Rewrites one side of the animation, leaving the other side alone. */
+function withAnimation(
+  current: TextAnimation | undefined,
+  slot: Slot,
+  id: AnimationId,
+  fps: number,
+): TextAnimation | undefined {
+  const durationFrames = current?.durationFrames ?? Math.max(1, Math.round(fps * 0.4));
+
+  let kind: TextAnimationKind | undefined;
+  let motion: MotionSpec | undefined;
+  if (id === "fade") {
+    kind = "fade";
+  } else if (id === "slide") {
+    kind = slot === "in" ? "slide-up" : "slide-down";
+  } else if (id === "pop") {
+    // The SDK has no "pop" kind, so a fade carries the scale that pops it.
+    kind = "fade";
+    motion = { scale: 0.55, opacity: 0, ease: slot === "in" ? "back-out" : "back-in" };
+  }
+
+  const next: TextAnimation =
+    slot === "in"
+      ? { out: current?.out, outMotion: current?.outMotion, in: kind, inMotion: motion, durationFrames }
+      : { in: current?.in, inMotion: current?.inMotion, out: kind, outMotion: motion, durationFrames };
+
+  return next.in || next.out ? next : undefined;
+}
 
 interface TextPanelProps {
   fps: number;
@@ -43,6 +118,9 @@ export function TextPanel({ fps }: TextPanelProps) {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const style = TEXT_STYLES[0];
+  // Reactive, so the controls below mirror whatever is selected right now.
+  const selected = useSelectedClip();
+  const textClip = selected?.clip.type === "text" ? selected : null;
 
   function currentText(): Clip | null {
     return selectedClips(engine).find((hit) => hit.clip.type === "text")?.clip ?? null;
@@ -111,10 +189,193 @@ export function TextPanel({ fps }: TextPanelProps) {
     reader.readAsText(file);
   }
 
+  /** Writes straight onto the selected clip, so every control is live. */
+  function patch(updates: Partial<Clip>) {
+    if (!textClip) return;
+    engine.updateClip(textClip.clip.id, textClip.trackId, updates);
+  }
+
+  function setAnimation(slot: Slot, id: AnimationId) {
+    if (!textClip) return;
+    patch({ textAnimation: withAnimation(textClip.clip.textAnimation, slot, id, fps) });
+  }
+
+  function removeText() {
+    const error = deleteSelection(engine);
+    if (error) toast(error, "error");
+    else toast("Text clip deleted");
+  }
+
+  const chipClass = (on: boolean) =>
+    `h-7 flex-1 rounded-md border text-[11px] text-white transition-colors duration-150 ${
+      on ? "border-[#00d4b4] bg-[#1e1e24]" : "border-[#3a3a40] bg-[#1a1a1e] hover:border-[#00d4b4]"
+    }`;
+
   return (
     <PanelBody>
       <div className="flex flex-col gap-3">
         <PrimaryButton onClick={() => placeTextClip(engine, fps, "Text")}>Add text</PrimaryButton>
+
+        <section>
+          <h3 className="mb-1 text-[11px] text-[#888899]">Selected text</h3>
+          {!textClip ? (
+            <HintNote>Select a text clip on the timeline to style it.</HintNote>
+          ) : (
+            <div className="flex flex-col gap-2 rounded-md bg-[#1a1a1e] p-2">
+              <label className="text-[11px] text-[#c8c8ce]">
+                Font
+                <select
+                  value={textClip.clip.fontFamily ?? CAPTION_FONTS[0]}
+                  aria-label="Text font"
+                  onChange={(event) => patch({ fontFamily: event.target.value })}
+                  className="mt-1 h-8 w-full rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2 text-[12px] text-white"
+                >
+                  {CAPTION_FONTS.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] text-[#c8c8ce]">
+                <span className="flex items-center justify-between">
+                  Size
+                  <span className="font-mono text-[#9a9aa2]">{textClip.clip.fontSize ?? 64}</span>
+                </span>
+                <input
+                  type="range"
+                  min={12}
+                  max={160}
+                  step={1}
+                  value={textClip.clip.fontSize ?? 64}
+                  aria-label="Text size"
+                  onChange={(event) =>
+                    engine.previewClip(textClip.clip.id, textClip.trackId, {
+                      fontSize: Number(event.target.value),
+                    })
+                  }
+                  onPointerUp={(event) => {
+                    patch({ fontSize: Number(event.currentTarget.value) });
+                    engine.commitInteraction("Text size");
+                  }}
+                  className="w-full accent-[#00d4b4]"
+                />
+              </label>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-[11px] text-[#c8c8ce]">Colour</span>
+                <div className="grid grid-cols-8 gap-1">
+                  {TEXT_COLORS.map((colour) => {
+                    const on = (textClip.clip.color ?? "#ffffff").toLowerCase() === colour;
+                    return (
+                      <button
+                        key={colour}
+                        type="button"
+                        aria-label={`Colour ${colour}`}
+                        aria-pressed={on}
+                        onClick={() => patch({ color: colour })}
+                        style={{ background: colour }}
+                        className={`h-6 w-full rounded border ${on ? "border-[#00d4b4]" : "border-[#3a3a40]"}`}
+                      />
+                    );
+                  })}
+                </div>
+                <input
+                  type="text"
+                  value={textClip.clip.color ?? "#ffffff"}
+                  aria-label="Text colour hex"
+                  spellCheck={false}
+                  onChange={(event) => {
+                    const raw = event.target.value.trim();
+                    // Only a complete hex commits; partial typing must not write.
+                    if (HEX_RE.test(raw)) patch({ color: raw });
+                  }}
+                  className="h-7 w-full rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2 font-mono text-[11px] text-white"
+                />
+              </div>
+
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  aria-label="Bold"
+                  aria-pressed={textClip.clip.fontWeight === "bold"}
+                  onClick={() =>
+                    patch({ fontWeight: textClip.clip.fontWeight === "bold" ? "normal" : "bold" })
+                  }
+                  className={`${chipClass(textClip.clip.fontWeight === "bold")} font-bold`}
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  aria-label="Italic"
+                  aria-pressed={textClip.clip.fontStyle === "italic"}
+                  onClick={() =>
+                    patch({ fontStyle: textClip.clip.fontStyle === "italic" ? "normal" : "italic" })
+                  }
+                  className={`${chipClass(textClip.clip.fontStyle === "italic")} italic`}
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  aria-label="Underline"
+                  aria-pressed={textClip.clip.textDecoration === "underline"}
+                  onClick={() =>
+                    patch({
+                      textDecoration:
+                        textClip.clip.textDecoration === "underline" ? undefined : "underline",
+                    })
+                  }
+                  className={`${chipClass(textClip.clip.textDecoration === "underline")} underline`}
+                >
+                  U
+                </button>
+              </div>
+
+              <div className="flex gap-1">
+                {ALIGNMENTS.map((align) => (
+                  <button
+                    key={align}
+                    type="button"
+                    aria-pressed={(textClip.clip.textAlign ?? "center") === align}
+                    onClick={() => patch({ textAlign: align })}
+                    className={`${chipClass((textClip.clip.textAlign ?? "center") === align)} capitalize`}
+                  >
+                    {align}
+                  </button>
+                ))}
+              </div>
+
+              {SLOTS.map((slot) => (
+                <div key={slot} className="flex flex-col gap-1">
+                  <span className="text-[11px] capitalize text-[#c8c8ce]">Animation {slot}</span>
+                  <div className="flex gap-1">
+                    {ANIMATIONS.map((animation) => {
+                      const on = animationOf(textClip.clip.textAnimation, slot) === animation.id;
+                      return (
+                        <button
+                          key={animation.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setAnimation(slot, animation.id)}
+                          className={chipClass(on)}
+                        >
+                          {animation.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <QuietButton onClick={removeText} tone="danger">
+                Delete text clip
+              </QuietButton>
+            </div>
+          )}
+        </section>
         <section>
           <h3 className="mb-1 text-[11px] text-[#888899]">Text presets</h3>
           <div className="grid grid-cols-2 gap-1.5">

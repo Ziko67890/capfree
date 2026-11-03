@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useTimelineEngine } from "@elah/editor";
 import type { CaptionLine } from "../../api";
-import { fetchCaptions, placeTimedCaption, seekFrame } from "../../captionActions";
+import { requestBurnSubtitles } from "../../api";
+import { fetchCaptions, placeTimedCaption, seekFrame, srtFromCaptions } from "../../captionActions";
 import { CAPTION_FONTS } from "../../catalog";
 import { placeTextClip } from "../../clipEdit";
 import { SPOKEN_LANGUAGES } from "../../library";
+import { fileFromClip, swapClipMedia, targetVideoClip } from "../../timelineMedia";
 import { stamp, useApiJob } from "../../useApiJob";
 import { ErrorNote, PanelBody, PrimaryButton, QuietButton } from "../chrome";
 import { useToast } from "../toast";
@@ -92,6 +94,27 @@ export function CaptionsPanel({ fps }: { fps: number }) {
     toast(`${transcript.lines.length} captions added to the timeline`);
   }
 
+  function burnCaptions() {
+    job.run("burn", async () => {
+      if (!transcript) throw new Error("Run auto captions first.");
+      const located = targetVideoClip(engine);
+      if (!located) throw new Error("Add a video to the timeline first.");
+      const srt = srtFromCaptions(transcript.lines);
+      if (!srt.trim()) throw new Error("There are no captions to burn.");
+
+      const blob = await requestBurnSubtitles(await fileFromClip(located.clip), srt, {
+        fontSize: style.text.fontSize,
+        position: "bottom",
+        font,
+      });
+      const file = new File([blob], "captioned.mp4", { type: "video/mp4" });
+      // Keep the clip's trim: restoring the full source length would overlap
+      // whatever follows it.
+      await swapClipMedia(engine, located, file, "video");
+      toast("Captions burned into the clip");
+    });
+  }
+
   function addManual() {
     const clip = placeTextClip(engine, fps, style.sample, { y: 0.86, fontSize: style.text.fontSize, durationSec: 3 });
     engine.updateClip(clip.id, clip.trackId, { name: style.label, color: style.text.color });
@@ -169,6 +192,13 @@ export function CaptionsPanel({ fps }: { fps: number }) {
               </button>
             </div>
             <QuietButton onClick={addAll}>Add all to timeline</QuietButton>
+            <PrimaryButton
+              onClick={burnCaptions}
+              busy={job.busy === "burn"}
+              disabled={job.busy !== null}
+            >
+              {job.busy === "burn" ? "Burning…" : "Burn captions"}
+            </PrimaryButton>
             <ul className="flex flex-col gap-1">
               {transcript.lines.map((line, index) => (
                 <li

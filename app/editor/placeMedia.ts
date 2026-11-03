@@ -84,21 +84,29 @@ export async function addAudioUrl(
   return result.clipIds[0];
 }
 
+/** MediaRecorder hands back webm or mp4 as often as it does mp3. */
+function audioExtension(type: string): string {
+  if (type.includes("wav")) return "wav";
+  if (type.includes("webm")) return "webm";
+  if (type.includes("ogg")) return "ogg";
+  if (type.includes("mp4") || type.includes("m4a") || type.includes("aac")) return "m4a";
+  return "mp3";
+}
+
 export async function addAudioBlob(
   engine: TimelineEngine,
   blob: Blob,
   name: string,
   startFrame?: number,
+  targetTrackId?: string,
 ): Promise<string | null> {
   const type = blob.type || "audio/mpeg";
-  const ext = type.includes("wav") ? "wav" : "mp3";
-  const file = new File([blob], `${name}.${ext}`, { type });
+  const file = new File([blob], `${name}.${audioExtension(type)}`, { type });
   const asset = await importBlob(file, { name, kind: "audio" });
-  const result = await insertMediaAsset(
-    engine,
-    asset.id,
-    startFrame === undefined ? undefined : { desiredStartFrame: startFrame },
-  );
+  const result = await insertMediaAsset(engine, asset.id, {
+    ...(startFrame === undefined ? {} : { desiredStartFrame: startFrame }),
+    ...(targetTrackId === undefined ? {} : { targetTrackId }),
+  });
   if (!result.ok || result.clipIds.length === 0) return null;
   engine.updateClip(result.clipIds[0], result.trackId, { name });
   selectClip(result.clipIds[0]);

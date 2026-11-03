@@ -14,12 +14,13 @@ interface Look {
   adjustCss: string;
   effectCss: string;
   vignette: number;
+  grain: number;
   reframe: CropRect | null;
   activeFilter: string | null;
   activeEffect: string | null;
   setFilter: (name: string | null, css: string) => void;
   setEffect: (name: string | null, css: string) => void;
-  setAdjust: (css: string, vignette: number) => void;
+  setAdjust: (css: string, vignette: number, grain?: number) => void;
   setReframe: (rect: CropRect | null) => void;
 }
 
@@ -32,6 +33,7 @@ export function PreviewLookProvider({ children }: { children: ReactNode }) {
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [adjustCss, setAdjustCss] = useState("");
   const [vignette, setVignette] = useState(0);
+  const [grain, setGrain] = useState(0);
   const [reframe, setReframe] = useState<CropRect | null>(null);
 
   const value = useMemo<Look>(
@@ -40,6 +42,7 @@ export function PreviewLookProvider({ children }: { children: ReactNode }) {
       adjustCss,
       effectCss,
       vignette,
+      grain,
       reframe,
       activeFilter,
       activeEffect,
@@ -51,13 +54,14 @@ export function PreviewLookProvider({ children }: { children: ReactNode }) {
         setActiveEffect(name);
         setEffectCss(css);
       },
-      setAdjust: (css, amount) => {
+      setAdjust: (css, amount, noise = 0) => {
         setAdjustCss(css);
         setVignette(amount);
+        setGrain(noise);
       },
       setReframe,
     }),
-    [activeEffect, activeFilter, adjustCss, effectCss, filterCss, reframe, vignette],
+    [activeEffect, activeFilter, adjustCss, effectCss, filterCss, grain, reframe, vignette],
   );
 
   return <LookContext.Provider value={value}>{children}</LookContext.Provider>;

@@ -17,7 +17,7 @@ const AVATARS = [
   { id: "a8", name: "Omar" },
 ];
 
-export function AvatarPanel({ fps: _fps }: { fps: number }) {
+export function AvatarPanel() {
   const [picked, setPicked] = useState("a1");
   const [voice, setVoice] = useState(VOICES[0]);
   const [script, setScript] = useState("Hi, welcome to my channel.");
@@ -60,10 +60,18 @@ export function AvatarPanel({ fps: _fps }: { fps: number }) {
             </button>
           ))}
         </div>
-        <button type="button" disabled className="h-9 rounded-md bg-[#2a2a30] text-[12px] font-semibold text-[#888899]">
+        <button
+          type="button"
+          disabled
+          title="No avatar backend is configured"
+          className="h-9 rounded-md bg-[#2a2a30] text-[12px] font-semibold text-[#888899] disabled:cursor-not-allowed"
+        >
           Generate
         </button>
-        <p className="text-center text-[11px] text-[#888899]">API later</p>
+        <p className="text-center text-[11px] leading-snug text-[#888899]">
+          Avatar rendering needs a provider the API does not expose yet, so the picker, script
+          and voice are saved locally and Generate stays off.
+        </p>
       </div>
     </PanelBody>
   );

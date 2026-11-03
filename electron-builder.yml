@@ -1,0 +1,44 @@
+appId: app.capfree
+productName: CapFree
+
+directories:
+  output: dist
+  # Drop icon.ico / icon.icns / icon.png in here to replace the stock Electron
+  # icon; electron-builder picks them up by name.
+  buildResources: build
+
+# Only the shell and the static export ship. The Next sources, the server build
+# and the dev launcher all stay out of the bundle.
+files:
+  - electron/main.js
+  - out-desktop/**/*
+  - package.json
+  # electron-builder bundles production dependencies by default. The export
+  # already has all of them compiled in, and main.js uses nothing but electron
+  # and node builtins, so none of it needs to ship.
+  - "!node_modules/**/*"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  category: public.app-category.video
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+
+dmg:
+  title: CapFree
+
+linux:
+  category: AudioVideo
+  target:
+    - target: AppImage
+      arch: [x64]

@@ -20,6 +20,7 @@ const KEYS = [
   "temperature",
   "tint",
   "vignette",
+  "grain",
   "fade",
 ] as const;
 
@@ -37,6 +38,7 @@ const ZERO: Values = {
   temperature: 0,
   tint: 0,
   vignette: 0,
+  grain: 0,
   fade: 0,
 };
 
@@ -48,13 +50,14 @@ const LABELS: Record<Key, string> = {
   sharpness: "Sharpness",
   highlights: "Highlights",
   shadows: "Shadows",
-  temperature: "Temperature",
+  temperature: "Warmth",
   tint: "Tint",
   vignette: "Vignette",
+  grain: "Grain",
   fade: "Fade",
 };
 
-function cssFor(values: Values): { css: string; vignette: number } {
+function cssFor(values: Values): { css: string; vignette: number; grain: number } {
   const parts: string[] = [];
   const brightness = 1 + (values.exposure + values.brightness) / 200 + values.highlights / 400 + values.shadows / 500;
   if (Math.abs(brightness - 1) > 0.001) parts.push(`brightness(${brightness.toFixed(3)})`);
@@ -67,7 +70,11 @@ function cssFor(values: Values): { css: string; vignette: number } {
   if (Math.abs(hue) > 0.4) parts.push(`hue-rotate(${hue.toFixed(1)}deg)`);
   if (values.sharpness < 0) parts.push(`blur(${((-values.sharpness / 100) * 3).toFixed(2)}px)`);
   if (values.fade !== 0) parts.push(`opacity(${(1 - Math.min(100, Math.abs(values.fade)) / 140).toFixed(3)})`);
-  return { css: parts.join(" "), vignette: Math.max(0, values.vignette) };
+  return {
+    css: parts.join(" "),
+    vignette: Math.max(0, values.vignette),
+    grain: Math.max(0, values.grain),
+  };
 }
 
 interface AdjustmentPanelProps {
@@ -88,7 +95,7 @@ export function AdjustmentPanel({ fps }: AdjustmentPanelProps) {
     const stored = selected ? (memory.current[selected.clip.id] ?? ZERO) : values;
     if (selected) setValues(stored);
     const next = cssFor(selected ? stored : values);
-    look.setAdjust(next.css, next.vignette);
+    look.setAdjust(next.css, next.vignette, next.grain);
     // Re-read only when the clip changes so slider drags stay live.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.clip.id]);
@@ -97,7 +104,7 @@ export function AdjustmentPanel({ fps }: AdjustmentPanelProps) {
     setValues(next);
     if (selected) memory.current[selected.clip.id] = next;
     const css = cssFor(next);
-    look.setAdjust(css.css, css.vignette);
+    look.setAdjust(css.css, css.vignette, css.grain);
   }
 
   function addAdjustment(name: string) {
@@ -131,6 +138,12 @@ export function AdjustmentPanel({ fps }: AdjustmentPanelProps) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={SAMPLE_PHOTO_WIDE} alt="After" className="h-24 w-full object-cover" style={{ filter: live.css || undefined }} />
                 {live.vignette > 0 && <span className="capfree-vignette pointer-events-none absolute inset-0" />}
+                {live.grain > 0 && (
+                  <span
+                    className="capfree-grain pointer-events-none absolute inset-0"
+                    style={{ opacity: (live.grain / 100) * 0.5 }}
+                  />
+                )}
               </span>
             </div>
           ) : (
@@ -138,6 +151,12 @@ export function AdjustmentPanel({ fps }: AdjustmentPanelProps) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={SAMPLE_PHOTO_WIDE} alt="Adjustment preview" className="h-28 w-full object-cover" style={{ filter: live.css || undefined }} />
               {live.vignette > 0 && <span className="capfree-vignette pointer-events-none absolute inset-0" />}
+              {live.grain > 0 && (
+                <span
+                  className="capfree-grain pointer-events-none absolute inset-0"
+                  style={{ opacity: (live.grain / 100) * 0.5 }}
+                />
+              )}
             </span>
           )}
         </div>

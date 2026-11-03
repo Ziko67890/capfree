@@ -19,7 +19,17 @@ import {
 
 /** Real MP4 decode. Without this, Preview paints a color + frame number. */
 const demuxerFactory = createDefaultDemuxerFactory();
+import {
+  applyAutoSave,
+  clearAutoSave,
+  clipsWithLostMedia,
+  readAutoSave,
+  type AutoSave,
+} from "./autosave";
 import { consumeSticker } from "./stickerDrag";
+import { useAutoSave } from "./useAutoSave";
+import { useShortcuts } from "./useShortcuts";
+import { RestoreBanner } from "./components/RestoreBanner";
 import { ExportModal } from "./components/ExportModal";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { LeftPanel } from "./components/LeftPanel";
@@ -28,7 +38,7 @@ import { TimelineBar } from "./components/TimelineBar";
 import { ToolBar, type EditorTab } from "./components/ToolBar";
 import { TopBar } from "./components/TopBar";
 import { PreviewLookProvider, usePreviewLook } from "./previewLook";
-import { ToastProvider } from "./components/toast";
+import { ToastProvider, useToast } from "./components/toast";
 
 const FPS = 30;
 
@@ -37,6 +47,14 @@ function EditorInner() {
   const [showExport, setShowExport] = useState(false);
   const [tab, setTab] = useState<EditorTab>("media");
   const engine = useTimelineEngine();
+  const toast = useToast();
+  // Read once on mount: a snapshot found here is offered, not applied.
+  const [pending, setPending] = useState<AutoSave | null>(() => readAutoSave());
+
+  // Held off until the offer is resolved, so the minute tick cannot overwrite
+  // the snapshot the banner is about to restore.
+  useAutoSave(pending === null);
+  useShortcuts(FPS);
   const playback = usePlayback();
   const tracks = useTracks();
   const timeline = useTimeline();
@@ -70,9 +88,34 @@ function EditorInner() {
     return () => engine.off("clip:added", onAdded);
   }, [engine]);
 
+  function restoreSession() {
+    if (!pending) return;
+    const failure = applyAutoSave(engine, pending);
+    setPending(null);
+    if (failure) {
+      toast(failure, "error");
+      return;
+    }
+    const lost = clipsWithLostMedia(engine);
+    toast(
+      lost === 0
+        ? "Session restored"
+        : `Session restored — ${lost} clip${lost === 1 ? "" : "s"} needs its media re-imported`,
+      lost === 0 ? "ok" : "error",
+    );
+  }
+
+  function discardSession() {
+    clearAutoSave();
+    setPending(null);
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#1a1a1e] text-white">
       <TopBar onExport={() => setShowExport(true)} />
+      {pending && (
+        <RestoreBanner save={pending} onRestore={restoreSession} onDiscard={discardSession} />
+      )}
       <ToolBar tab={tab} onTab={setTab} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -93,6 +136,13 @@ function EditorInner() {
               <div
                 className="pointer-events-none absolute inset-0"
                 style={{ boxShadow: `inset 0 0 ${40 + look.vignette * 1.4}px rgba(0,0,0,${0.25 + look.vignette / 180})` }}
+              />
+            )}
+            {look.grain > 0 && (
+              /* The class carries the noise; the slider scales how much shows. */
+              <div
+                className="capfree-grain pointer-events-none absolute inset-0"
+                style={{ opacity: (look.grain / 100) * 0.5 }}
               />
             )}
             {look.reframe && (
@@ -132,7 +182,7 @@ function EditorInner() {
         </div>
       </div>
 
-      {showExport && <ExportModal fps={FPS} onClose={() => setShowExport(false)} />}
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>
   );
 }
