@@ -10,15 +10,22 @@ import {
   type MouseEvent,
 } from "react";
 import { usePlaybackStore, useTimelineEngine } from "@elah/editor";
-import { requestBurnSubtitles, requestCaptions } from "../../api";
+import { requestBurnSubtitles, requestCaptions, requestSilenceRemoval } from "../../api";
 import { seekFrame } from "../../captionActions";
 import { SPOKEN_LANGUAGES } from "../../library";
-import { fileFromClip, swapClipMedia, targetVideoClip } from "../../timelineMedia";
 import {
+  fileFromClip,
+  mergeClipRunMedia,
+  swapClipMedia,
+  targetVideoClip,
+} from "../../timelineMedia";
+import {
+  applyCuts,
   buildLines,
   cutRanges,
   cutRangesFromTimeline,
   reflow,
+  removedBefore,
   sourceSecondToFrame,
   toPlainText,
   toSrt,
@@ -224,16 +231,42 @@ export function TranscriptPanel({ fps, active }: { fps: number; active: boolean 
       if (!located) throw new Error("That clip is no longer on the timeline.");
       const srt = toSrt(doc.lines);
       if (!srt.trim()) throw new Error("There are no captions left to burn.");
-      const blob = await requestBurnSubtitles(await fileFromClip(located.clip), srt, {
-        fontSize: 48,
-        position: "bottom",
-        font: "Inter",
-      });
+
+      const style = { fontSize: 48, position: "bottom", font: "Inter" };
+      const source = await fileFromClip(located.clip);
+
+      if (pending.length === 0) {
+        const blob = await requestBurnSubtitles(source, srt, style);
+        const file = new File([blob], "captioned.mp4", { type: "video/mp4" });
+        // Keep the clip's trim: restoring the full source length would overlap
+        // whatever follows the clip.
+        await swapClipMedia(engine, located, file, "video");
+        toast("Captions burned into the clip");
+        return;
+      }
+
+      // Cuts live on the timeline, not in the source file. Trim them out of the
+      // source first, so the reflowed caption timings land on the right frames.
+      const trimmed = await requestSilenceRemoval(source, { segments: pending, padding: 0 });
+      const blob = await requestBurnSubtitles(
+        new File([trimmed], "trimmed.mp4", { type: "video/mp4" }),
+        srt,
+        style,
+      );
       const file = new File([blob], "captioned.mp4", { type: "video/mp4" });
-      // Keep the clip's trim: cuts may have split it, and restoring the full
-      // source length would overlap the piece that follows.
-      await swapClipMedia(engine, located, file, "video");
-      toast("Captions burned into the clip");
+
+      // The trim shortens everything ahead of the clip too, so its own start
+      // into the source moves back by whatever was cut before it.
+      const startSecond = (located.clip.sourceStartFrame ?? 0) / fps;
+      await mergeClipRunMedia(engine, located, file, {
+        pieces: pending.length + 1,
+        sourceStartFrame: Math.round((startSecond - removedBefore(pending, startSecond)) * fps),
+        fps,
+      });
+      // The cuts are in the media now, so the transcript has to describe it.
+      setDoc({ ...doc, lines: applyCuts(doc.lines) });
+      setRevision((value) => value + 1);
+      toast("Captions burned in and cuts rendered");
     });
   }
 
@@ -348,9 +381,6 @@ export function TranscriptPanel({ fps, active }: { fps: number; active: boolean 
               Export transcript
             </QuietButton>
           </div>
-          <p className="mt-2 text-[10px] leading-snug text-[#888899]">
-            Burn-in renders onto the clip&apos;s source media, so it uses the original timings.
-          </p>
         </>
       )}
     </PanelBody>

@@ -97,9 +97,21 @@ export async function requestCaptions(file: File, language?: string): Promise<Ca
   return response.json() as Promise<CaptionsResponse>;
 }
 
-export async function requestSilenceRemoval(file: File): Promise<Blob> {
+/**
+ * Trims a file down. With no `segments` the API detects silence itself; with
+ * them it cuts exactly those ranges, which is how the transcript editor turns
+ * its cuts into a trimmed source.
+ */
+export async function requestSilenceRemoval(
+  file: File,
+  options?: { segments?: ReadonlyArray<{ start: number; end: number }>; padding?: number },
+): Promise<Blob> {
   const body = new FormData();
   body.append("file", file);
+  if (options?.segments && options.segments.length > 0) {
+    body.append("segments", JSON.stringify(options.segments));
+  }
+  if (options?.padding !== undefined) body.append("padding", String(options.padding));
   const response = await postForm("/silence/remove", body);
   return response.blob();
 }

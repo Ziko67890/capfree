@@ -220,32 +220,34 @@ export const EFFECT_LOOKS: EffectLook[] = [
 export interface TransitionLook {
   name: string;
   cls: string;
-  duration: string;
   kind: "fade" | "slide" | "wipe" | "zoom" | "spin" | "whip" | "glitchCut" | "warpDissolve" | "lumaWipe";
   direction?: "left" | "right" | "up";
+  /** A hard cut: it ignores the duration slider and stays as short as it can. */
+  instant?: boolean;
 }
 
+/** The eight named in the brief lead; the rest follow in the same grid. */
 export const TRANSITION_LOOKS: TransitionLook[] = [
-  { name: "Cut", cls: "capfree-tr-cut", duration: "0.0s", kind: "fade" },
-  { name: "Dissolve", cls: "capfree-tr-dissolve", duration: "0.6s", kind: "fade" },
-  { name: "Fade Black", cls: "capfree-tr-black", duration: "0.6s", kind: "fade" },
-  { name: "Fade White", cls: "capfree-tr-white", duration: "0.6s", kind: "fade" },
-  { name: "Slide Left", cls: "capfree-tr-slide-l", duration: "0.5s", kind: "slide", direction: "left" },
-  { name: "Slide Right", cls: "capfree-tr-slide-r", duration: "0.5s", kind: "slide", direction: "right" },
-  { name: "Slide Up", cls: "capfree-tr-slide-u", duration: "0.5s", kind: "slide", direction: "up" },
-  { name: "Push Left", cls: "capfree-tr-push", duration: "0.5s", kind: "slide", direction: "left" },
-  { name: "Zoom In", cls: "capfree-tr-zoomin", duration: "0.5s", kind: "zoom" },
-  { name: "Zoom Out", cls: "capfree-tr-zoomout", duration: "0.5s", kind: "zoom" },
-  { name: "Flash", cls: "capfree-tr-flash", duration: "0.4s", kind: "fade" },
-  { name: "Spin CW", cls: "capfree-tr-spin", duration: "0.6s", kind: "spin" },
-  { name: "Flip H", cls: "capfree-tr-flip", duration: "0.5s", kind: "spin" },
-  { name: "Wipe Left", cls: "capfree-tr-wipe-l", duration: "0.5s", kind: "wipe", direction: "left" },
-  { name: "Wipe Right", cls: "capfree-tr-wipe-r", duration: "0.5s", kind: "wipe", direction: "right" },
-  { name: "Circle Open", cls: "capfree-tr-circle", duration: "0.6s", kind: "lumaWipe" },
-  { name: "Glitch Cut", cls: "capfree-tr-glitch", duration: "0.3s", kind: "glitchCut" },
-  { name: "Bounce", cls: "capfree-tr-bounce", duration: "0.6s", kind: "zoom" },
-  { name: "Elastic", cls: "capfree-tr-elastic", duration: "0.7s", kind: "warpDissolve" },
-  { name: "Shatter", cls: "capfree-tr-shatter", duration: "0.5s", kind: "glitchCut" },
+  { name: "Fade", cls: "capfree-tr-black", kind: "fade" },
+  { name: "Cut", cls: "capfree-tr-cut", kind: "fade", instant: true },
+  { name: "Dissolve", cls: "capfree-tr-dissolve", kind: "fade" },
+  { name: "Wipe Left", cls: "capfree-tr-wipe-l", kind: "wipe", direction: "left" },
+  { name: "Wipe Right", cls: "capfree-tr-wipe-r", kind: "wipe", direction: "right" },
+  { name: "Zoom In", cls: "capfree-tr-zoomin", kind: "zoom" },
+  { name: "Zoom Out", cls: "capfree-tr-zoomout", kind: "zoom" },
+  { name: "Slide", cls: "capfree-tr-slide-l", kind: "slide", direction: "left" },
+  { name: "Fade White", cls: "capfree-tr-white", kind: "fade" },
+  { name: "Slide Right", cls: "capfree-tr-slide-r", kind: "slide", direction: "right" },
+  { name: "Slide Up", cls: "capfree-tr-slide-u", kind: "slide", direction: "up" },
+  { name: "Push Left", cls: "capfree-tr-push", kind: "slide", direction: "left" },
+  { name: "Flash", cls: "capfree-tr-flash", kind: "fade" },
+  { name: "Spin CW", cls: "capfree-tr-spin", kind: "spin" },
+  { name: "Flip H", cls: "capfree-tr-flip", kind: "spin" },
+  { name: "Circle Open", cls: "capfree-tr-circle", kind: "lumaWipe" },
+  { name: "Glitch Cut", cls: "capfree-tr-glitch", kind: "glitchCut" },
+  { name: "Bounce", cls: "capfree-tr-bounce", kind: "zoom" },
+  { name: "Elastic", cls: "capfree-tr-elastic", kind: "warpDissolve" },
+  { name: "Shatter", cls: "capfree-tr-shatter", kind: "glitchCut" },
 ];
 
 export interface TextPreset {

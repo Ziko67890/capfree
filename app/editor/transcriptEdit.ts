@@ -73,15 +73,25 @@ export function cutRanges(lines: ReadonlyArray<TranscriptLine>): TimeRange[] {
   return ranges;
 }
 
+/** Seconds of cut material lying before a point in the source. */
+export function removedBefore(ranges: ReadonlyArray<TimeRange>, second: number): number {
+  let removed = 0;
+  for (const range of ranges) {
+    if (range.end <= second) removed += range.end - range.start;
+    else if (range.start < second) removed += second - range.start;
+  }
+  return removed;
+}
+
 /** Timestamps as they read after the cuts above are removed. */
 export function reflow(lines: ReadonlyArray<TranscriptLine>): ReflowedWord[] {
-  let removed = 0;
+  // Measured off the merged ranges, not the cut words: a range swallows the
+  // tiny gaps between adjacent cut words, and those seconds leave too.
+  const ranges = cutRanges(lines);
   const out: ReflowedWord[] = [];
   for (const word of allWords(lines).sort((a, b) => a.start - b.start)) {
-    if (word.cut) {
-      removed += word.end - word.start;
-      continue;
-    }
+    if (word.cut) continue;
+    const removed = removedBefore(ranges, word.start);
     out.push({
       ...word,
       displayStart: Math.max(0, word.start - removed),
@@ -102,22 +112,50 @@ function timestamp(seconds: number, separator: "," | "."): string {
 }
 
 /**
- * SRT for the surviving words, timed against the **source** media, which the
- * burn-in endpoint receives uncut.
+ * SRT for the surviving words, timed against media the cuts have already been
+ * taken out of — which is what the burn-in endpoint receives. With nothing cut
+ * these are the source timings unchanged.
  */
 export function toSrt(lines: ReadonlyArray<TranscriptLine>): string {
+  const timed = new Map(reflow(lines).map((word) => [word.id, word]));
   const blocks: string[] = [];
   for (const line of lines) {
     const kept = line.words.filter((word) => !word.cut && word.text.trim());
     if (kept.length === 0) continue;
+    const times: ReflowedWord[] = [];
+    for (const word of kept) {
+      const at = timed.get(word.id);
+      if (at) times.push(at);
+    }
+    if (times.length === 0) continue;
     const text = kept.map((word) => word.text.trim()).join(" ");
-    const start = Math.min(...kept.map((word) => word.start));
-    const end = Math.max(...kept.map((word) => word.end));
+    const start = Math.min(...times.map((word) => word.displayStart));
+    const end = Math.max(...times.map((word) => word.displayEnd));
     blocks.push(
       `${blocks.length + 1}\n${timestamp(start, ",")} --> ${timestamp(end, ",")}\n${text}\n`,
     );
   }
   return blocks.join("\n");
+}
+
+/**
+ * Drops the cut words and rebases the rest onto media the cuts have already
+ * been removed from, so the transcript keeps describing the clip once a
+ * cut-aware burn has re-rendered it.
+ */
+export function applyCuts(lines: ReadonlyArray<TranscriptLine>): TranscriptLine[] {
+  const timed = new Map(reflow(lines).map((word) => [word.id, word]));
+  const out: TranscriptLine[] = [];
+  for (const line of lines) {
+    const words = line.words
+      .filter((word) => !word.cut)
+      .map((word) => {
+        const at = timed.get(word.id);
+        return at ? { ...word, start: at.displayStart, end: at.displayEnd } : word;
+      });
+    if (words.length > 0) out.push({ ...line, words });
+  }
+  return out;
 }
 
 export function toPlainText(lines: ReadonlyArray<TranscriptLine>): string {

@@ -109,6 +109,28 @@ def cut_silences(src: str, dst: str, silences: list, duration: float, padding: f
         raise HTTPException(500, "Failed to cut silences from the video")
 
 
+def _chosen_segments(raw: str) -> list:
+    """JSON list of {start, end} ranges the caller wants cut out, in order."""
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(400, "segments must be JSON")
+    if not isinstance(parsed, list) or not parsed:
+        raise HTTPException(400, "segments must be a non-empty list")
+    chosen = []
+    for item in parsed:
+        if not isinstance(item, dict) or "start" not in item or "end" not in item:
+            raise HTTPException(400, "each segment needs start and end")
+        start = float(item["start"])
+        end = float(item["end"])
+        if end <= start:
+            continue
+        chosen.append({"start": start, "end": end})
+    if not chosen:
+        raise HTTPException(400, "No valid segments to remove")
+    return sorted(chosen, key=lambda s: s["start"])
+
+
 def check_auth(x_api_key: Optional[str]):
     api_key = os.getenv("API_KEY")
     if api_key and x_api_key != api_key:
@@ -145,9 +167,14 @@ def silence_remove(
     threshold_db: float = Form(-30),
     min_duration: float = Form(0.5),
     padding: float = Form(0.05),
+    segments: Optional[str] = Form(None),
     x_api_key: Optional[str] = Header(None),
 ):
-    """Remove silent segments from a video and return the trimmed file."""
+    """Remove silent segments from a video and return the trimmed file.
+
+    Pass `segments` as a JSON list of {start, end} to cut exactly those ranges
+    instead of detecting silence. Omit it to keep the old behavior.
+    """
     check_auth(x_api_key)
     tmp = tempfile.mkdtemp()
     try:
@@ -156,9 +183,12 @@ def silence_remove(
         duration, has_video, has_audio = probe(src)
         if not has_audio:
             raise HTTPException(400, "This file has no audio track")
-        silences = detect_silences(src, threshold_db, min_duration)
+        if segments and segments.strip():
+            cuts = _chosen_segments(segments)
+        else:
+            cuts = detect_silences(src, threshold_db, min_duration)
         out = os.path.join(tmp, "trimmed.mp4")
-        cut_silences(src, out, silences, duration, padding)
+        cut_silences(src, out, cuts, duration, padding)
         background.add_task(shutil.rmtree, tmp, True)
         return FileResponse(out, media_type="video/mp4", filename="trimmed.mp4")
     except Exception:

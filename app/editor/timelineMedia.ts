@@ -95,6 +95,69 @@ export async function swapClipMedia(
   });
 }
 
+/** Abutting pieces of one source, head first — what cutting leaves behind. */
+function clipRun(engine: TimelineEngine, located: LocatedClip, limit: number): Clip[] {
+  const onTrack = [...engine.getClipsOnTrack(located.trackId)].sort(
+    (a, b) => a.startFrame - b.startFrame,
+  );
+  const index = onTrack.findIndex((clip) => clip.id === located.clip.id);
+  if (index === -1) return [];
+
+  const run = [onTrack[index]];
+  for (let i = index + 1; i < onTrack.length && run.length < limit; i += 1) {
+    const previous = run[run.length - 1];
+    const next = onTrack[i];
+    const sameSource = located.clip.assetId
+      ? next.assetId === located.clip.assetId
+      : next.src === located.clip.src;
+    // A gap, a different source, or source time running backwards all mean the
+    // next clip is its own thing rather than the tail of this cut-up one.
+    if (!sameSource) break;
+    if (next.startFrame !== previous.startFrame + previous.durationFrames) break;
+    if (next.sourceStartFrame <= previous.sourceStartFrame) break;
+    run.push(next);
+  }
+  return run;
+}
+
+/**
+ * Collapses an abutting run of pieces of one source into a single clip on the
+ * new file. Cutting from the transcript splits a clip into pieces; a trimmed
+ * re-render is those pieces joined back up, so it takes the whole span they
+ * held between them and the surrounding clips never move.
+ */
+export async function mergeClipRunMedia(
+  engine: TimelineEngine,
+  located: LocatedClip,
+  file: File,
+  options: { pieces: number; sourceStartFrame: number; fps: number },
+): Promise<void> {
+  const run = clipRun(engine, located, Math.max(1, options.pieces));
+  if (run.length === 0) throw new Error("That clip is no longer on the timeline");
+
+  const asset = await importBlob(file, { name: file.name, kind: "video" });
+  const frames = run.reduce((total, clip) => total + clip.durationFrames, 0);
+  const assetFrames =
+    Number.isFinite(asset.durationSec) && asset.durationSec > 0
+      ? Math.max(1, Math.round(asset.durationSec * options.fps))
+      : undefined;
+  const updates: Partial<Clip> = {
+    src: asset.src,
+    assetId: asset.id,
+    name: asset.name,
+    durationFrames: frames,
+    sourceStartFrame: Math.max(0, options.sourceStartFrame),
+    sourceDurationFrames: frames,
+    ...(assetFrames !== undefined ? { assetFrames } : {}),
+  };
+
+  engine.batch(() => {
+    // The tails go first: growing the head into their span would overlap them.
+    for (const piece of run.slice(1)) engine.removeClip(piece.id, located.trackId);
+    engine.updateClip(located.clip.id, located.trackId, updates);
+  }, "Burn captions");
+}
+
 /** Point a clip at a newly imported file. Video length follows the new media. */
 export async function replaceClipFile(
   engine: TimelineEngine,

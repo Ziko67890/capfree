@@ -197,28 +197,6 @@ export function adjustmentEffects(
   return next;
 }
 
-export function transitionTarget(
-  engine: TimelineEngine,
-): { from: Clip; to: Clip; trackId: string } | { error: string } {
-  const hits = selectedClips(engine).filter((hit) => hit.clip.type !== "audio");
-  if (hits.length === 0) {
-    return { error: "Select a clip, then choose a transition into the next clip." };
-  }
-
-  const sameTrack = hits.filter((hit) => hit.trackId === hits[0].trackId);
-  if (sameTrack.length >= 2) {
-    const ordered = [...sameTrack].sort((a, b) => a.clip.startFrame - b.clip.startFrame);
-    return { from: ordered[0].clip, to: ordered[1].clip, trackId: ordered[0].trackId };
-  }
-
-  const primary = hits[0];
-  const following = (engine.getProject().clips[primary.trackId] ?? [])
-    .filter((clip) => clip.id !== primary.clip.id && clip.startFrame > primary.clip.startFrame)
-    .sort((a, b) => a.startFrame - b.startFrame)[0];
-  if (!following) return { error: "Add another clip after this one on the same track." };
-  return { from: primary.clip, to: following, trackId: primary.trackId };
-}
-
 export function withTransform(clip: Clip, patch: Partial<Transform>): Transform {
   const current = baseTransform(clip);
   return { ...current, ...patch, anchor: patch.anchor ?? current.anchor };
