@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 export const fieldClass =
-  "h-8 w-full rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2 text-[12px] text-white outline-none focus:border-[#00d4b4]";
+  "h-8 w-full rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2 text-[12px] text-white outline-none focus:border-[#ffffff]";
 
 export function PanelFrame({
   title,
@@ -66,7 +66,7 @@ export function PresetButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-[76px] flex-col items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-1 text-[11px] text-white hover:border-[#00d4b4]"
+      className="flex h-[76px] flex-col items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-1 text-[11px] text-white hover:border-[#ffffff]"
     >
       {children}
       <span className="max-w-full truncate">{label}</span>

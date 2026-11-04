@@ -49,7 +49,7 @@ export function ToastDock() {
           key={item.id}
           role={item.tone === "error" ? "alert" : "status"}
           className={`rounded-md px-2 py-1.5 text-[11px] leading-snug shadow-lg ${
-            item.tone === "error" ? "bg-red-600 text-white" : "bg-[#00d4b4] text-black"
+            item.tone === "error" ? "bg-red-600 text-white" : "bg-[#ffffff] text-black"
           }`}
         >
           {item.text}

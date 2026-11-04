@@ -156,7 +156,7 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
         <p className="mb-2 truncate rounded-md bg-[#1e1e24] px-2 py-1.5 text-[11px]">
           <span className="text-white">{gapLabel(target)}</span>
           {live ? (
-            <span className="text-[#00d4b4]">
+            <span className="text-[#ffffff]">
               {` · ${live.kind} ${(live.durationFrames / fps).toFixed(2)}s`}
             </span>
           ) : (
@@ -194,13 +194,13 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
                 aria-pressed={active}
                 className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors duration-150 ${
                   active
-                    ? "border-[#00d4b4] bg-[#1e1e24]"
+                    ? "border-[#ffffff] bg-[#1e1e24]"
                     : "border-[#2a2a30] bg-[#1a1a1e] hover:border-[#3a3a42]"
                 }`}
               >
                 <span
                   aria-hidden
-                  className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-[#00d4b4]" : "bg-[#3a3a42]"}`}
+                  className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-[#ffffff]" : "bg-[#3a3a42]"}`}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[11px] text-white">{gapLabel(gap)}</span>
@@ -232,7 +232,7 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
           onChange={(event) => setSeconds(Number(event.target.value))}
           onPointerUp={commitDuration}
           onKeyUp={commitDuration}
-          className="w-full accent-[#00d4b4]"
+          className="w-full accent-[#ffffff]"
         />
       </label>
 
@@ -261,7 +261,7 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
               }}
               onClick={() => apply(card)}
               className={`group capfree-tr-stage relative overflow-hidden rounded-md bg-black text-left ${card.cls} ${
-                picked === card.name ? "ring-2 ring-[#00d4b4]" : "hover:ring-1 hover:ring-[#00d4b4]"
+                picked === card.name ? "ring-2 ring-[#ffffff]" : "hover:ring-1 hover:ring-[#ffffff]"
               }`}
               style={{ aspectRatio: "2 / 3" }}
             >
@@ -296,7 +296,7 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
         type="button"
         onClick={applyToAll}
         disabled={gaps.length === 0}
-        className="mt-2 h-8 w-full rounded-md bg-[#2a2a30] text-[12px] text-white transition-colors duration-150 hover:border hover:border-[#00d4b4] disabled:opacity-50"
+        className="mt-2 h-8 w-full rounded-md bg-[#2a2a30] text-[12px] text-white transition-colors duration-150 hover:border hover:border-[#ffffff] disabled:opacity-50"
       >
         Apply {picked} to every cut
       </button>

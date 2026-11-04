@@ -52,7 +52,7 @@ export function PlaybackControls({
       <button
         onClick={isPlaying ? onPause : onPlay}
         aria-label={isPlaying ? "Pause" : "Play"}
-        className="w-9 h-9 rounded-full bg-[#00d4b4] flex items-center justify-center text-black hover:bg-[#00bba3] transition-colors flex-shrink-0"
+        className="w-9 h-9 rounded-full bg-[#ffffff] flex items-center justify-center text-black hover:bg-[#e6e6e6] transition-colors flex-shrink-0"
       >
         {isPlaying ? (
           <Pause className="w-4 h-4" fill="currentColor" />
@@ -65,7 +65,7 @@ export function PlaybackControls({
       <button
         onClick={onToggleLoop}
         aria-label="Toggle loop"
-        className={`transition-colors ${loop ? "text-[#00d4b4]" : "text-[#888] hover:text-white"}`}
+        className={`transition-colors ${loop ? "text-[#ffffff]" : "text-[#888] hover:text-white"}`}
       >
         <Repeat className="w-4 h-4" />
       </button>
@@ -79,7 +79,7 @@ export function PlaybackControls({
       <div className="flex-1 relative h-1.5 bg-[#2a2a2e] rounded-full cursor-pointer group">
         {/* Progress fill */}
         <div
-          className="absolute left-0 top-0 h-full bg-[#00d4b4] rounded-full pointer-events-none"
+          className="absolute left-0 top-0 h-full bg-[#ffffff] rounded-full pointer-events-none"
           style={{ width: totalFrames > 0 ? `${(currentFrame / totalFrames) * 100}%` : "0%" }}
         />
         {/* Invisible range input for interaction */}

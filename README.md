@@ -1,167 +1,171 @@
+<div align="center">
+
+<!-- Replace this comment with your logo image once you have it as a PNG -->
+<!-- <img src="public/logo.png" alt="CapFree Logo" width="80" /> -->
+
 # CapFree
 
-**Free video editor. No watermark. No account. No ByteDance.**
+**Free, open-source video editor for the browser and desktop.**  
+No watermark. No account. No ByteDance.
 
-A CapCut-style video editor that runs in your browser, with a Python backend for the
-AI-heavy work. Everything runs on hardware you control.
+[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-black.svg)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Python-black.svg)](https://fastapi.tiangolo.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-black.svg)](https://typescriptlang.org)
 
----
+[**Launch Editor →**](https://capfree.app) · [Website](https://capfree.app) · [Report a Bug](https://github.com/Ziko67890/capfree/issues) · [Request a Feature](https://github.com/Ziko67890/capfree/issues)
 
-## Quick start
+<!-- Add a demo GIF here — record yourself deleting a word from the transcript and watch the video cut -->
+<!-- <img src="docs/demo.gif" alt="CapFree Demo" width="100%" /> -->
 
-```bash
-docker compose up --build
-```
-
-That builds and starts both services:
-
-| Service    | URL                     | What it is                        |
-|------------|-------------------------|-----------------------------------|
-| Editor     | http://localhost:3000   | Next.js frontend                  |
-| API        | http://localhost:8000   | FastAPI backend (`/docs` for Swagger) |
-
-The first build is slow — the backend image installs Whisper, Demucs, Real-ESRGAN and
-OpenCV, and bakes the background-removal models in so the first request isn't slow.
-Later builds are cached.
-
-Open http://localhost:3000 and hit **Launch Editor**.
+</div>
 
 ---
 
-## Your footage never leaves your machine
+## What is CapFree?
 
-There is no upload step and no cloud account. Your clips are decoded in the browser with
-WebCodecs, and the AI features post to the FastAPI service running in a container next to
-it — on your own machine, on localhost. Nothing is sent anywhere else, and there is nothing
-to opt out of.
+CapFree is a full-featured video editor that runs entirely in your browser. It packs the AI tools you'd normally pay for — auto-captions, vocal isolation, beat sync, AI upscale — and gives them to you free, forever, with no watermark and no account required.
+
+The source code is MIT-licensed. Host it yourself, fork it, build on top of it.
 
 ---
 
 ## Features
 
-| Feature                 | What it does                                                        | Status |
-|-------------------------|---------------------------------------------------------------------|--------|
-| **Auto Captions**       | Transcribes speech and drops timed caption clips onto the timeline   | Wired  |
-| **Vocal Split**         | Separates vocals from backing music into two editable tracks         | Wired  |
-| **Filler Remover**      | Finds every *um*, *uh* and *like*, then cuts the ones you tick       | Wired  |
-| **Beat Sync**           | Detects tempo and lands your cuts on the beat                        | Wired  |
-| **Background Removal**  | Strips the background off a shot for a transparent cut-out           | Wired  |
-| **Transcript Editing**  | Edit the words, the video follows                                    | UI only |
+| Feature | How it works |
+|---|---|
+| 🤖 **AI Auto-Captions** | Whisper-powered speech recognition. 20+ languages, editable transcript, burn to video |
+| 🎙️ **Vocal Isolation** | Demucs AI separates voice from background music. Download stems or drop them in the timeline |
+| ✂️ **Remove Silence** | FFmpeg detects and cuts dead air automatically. Set the threshold, preview, done |
+| 🎵 **Beat Sync** | librosa detects beats. One click snaps your cuts to the rhythm of your music |
+| 📐 **Auto Reframe** | OpenCV tracks your subject and reframes for any aspect ratio — 9:16, 1:1, 4:3 |
+| 🔼 **AI Upscale** | Real-ESRGAN boosts old footage to 4K. Sharpen faces. Rescue low-res clips |
+| ⚡ **Speed Control** | 0.25× to 4× speed. Reverse. Freeze frame. Speed presets with a single click |
+| 💾 **Auto-Save** | Your project saves every 60 seconds. Close the tab, come back — it's all there |
+| 🖥️ **Desktop App** | Download for Windows, Mac, or Linux. Same editor, no browser needed |
 
-Also in the editor: multi-track timeline, real-time preview, text and stickers, filters,
-colour grading, per-clip effects, transitions, translation, and in-browser MP4 export
-(H.264 + AAC, 480p/720p/1080p).
+### The Transcript Editor — your biggest differentiator
 
-"Wired" means the panel calls the backend end to end. "UI only" means the panel is built
-but not yet connected — the Reframe, Highlights and AI Avatar panels are in the same state
-and are labelled as such in the app.
+Delete a word from the transcript. The video cut happens automatically. It's the fastest way to trim talking-head content — no scrubbing, no razor tool.
 
----
-
-## Tech stack
-
-**Frontend** — Next.js 16, React 19, TypeScript, Tailwind CSS 4, and the
-[@elah/editor](https://www.elah.dev) engine (Apache-2.0) for the timeline and preview.
-
-**Backend** — Python with FastAPI and FFmpeg, plus:
-
-| Tool             | Used for                         |
-|------------------|----------------------------------|
-| **Whisper**      | Transcription, captions, fillers |
-| **Demucs**       | Vocal / music separation         |
-| **librosa**      | Beat and tempo detection         |
-| **Real-ESRGAN**  | Upscaling                        |
-| **OpenCV**       | Motion tracking                  |
-| **rembg**        | Background removal               |
+- Select words to cut that exact segment from your video
+- Click any word to jump to that moment in the timeline
+- Retype a word to fix a caption without changing the cut
+- Export the edited transcript as `.txt` or `.srt`
 
 ---
 
-## Running without Docker
+## Tech Stack
 
-Two terminals.
+**Frontend**
+- Next.js 16 / React 19 / TypeScript
+- Tailwind CSS v4
+- `@elah/editor` SDK — WebGL2 GPU preview, multi-track timeline, WebCodecs MP4 export
+- Electron (desktop app — Windows `.exe`, Mac `.dmg`, Linux AppImage)
+
+**Backend (Python / FastAPI)**
+- [Whisper](https://github.com/openai/whisper) — transcription & captions
+- [Demucs](https://github.com/facebookresearch/demucs) — vocal isolation
+- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) — AI upscaling
+- [librosa](https://librosa.org) — beat detection
+- [OpenCV](https://opencv.org) + FFmpeg — reframe, silence removal, video processing
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js 20+
+- Python 3.10+
+- FFmpeg installed on your system
+
+### 1. Clone the repo
 
 ```bash
-# frontend
+git clone https://github.com/Ziko67890/capfree.git
+cd capfree
+```
+
+### 2. Start the frontend
+
+```bash
 npm install
 npm run dev
-# → http://localhost:3000
 ```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+### 3. Start the ML backend
 
 ```bash
-# backend
-cd api
+cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
-# → http://localhost:8000/docs
 ```
 
-The frontend defaults to `http://localhost:8000` when `NEXT_PUBLIC_API_URL` is unset, so
-this works with no configuration.
+The backend runs at [http://localhost:8000](http://localhost:8000)
+
+### 4. (Optional) Run the desktop app
+
+```bash
+npm run electron:dev
+```
 
 ---
 
-## Configuration
-
-| Variable               | Default                 | What it does                                  |
-|------------------------|-------------------------|-----------------------------------------------|
-| `NEXT_PUBLIC_API_URL`  | `http://localhost:8000` | Where the browser sends API calls              |
-| `WHISPER_MODEL`        | `base`                  | `tiny` / `base` / `small` / `medium` / `large-v3` |
-| `MAX_UPLOAD_MB`        | `200`                   | Largest accepted upload                        |
-| `API_KEY`              | *(unset)*               | If set, requires an `x-api-key` header         |
-| `ELEVENLABS_API_KEY`   | *(unset)*               | Needed only for `POST /tts`                    |
-
-`NEXT_PUBLIC_API_URL` is inlined into the browser bundle when the frontend is **built**,
-not when it starts. In Docker it is passed as a build arg; changing it means rebuilding
-the frontend image, not just restarting it.
-
----
-
-## API
-
-`GET /health` plus:
-
-| Endpoint                | Does                                              |
-|-------------------------|---------------------------------------------------|
-| `POST /captions`        | Transcribe audio → captions (JSON / SRT / VTT)    |
-| `POST /silence/detect`  | Find silent segments                              |
-| `POST /silence/remove`  | Cut silence, return trimmed video                 |
-| `POST /fillers/detect`  | Find filler words                                 |
-| `POST /fillers/remove`  | Cut filler words, return cleaned video            |
-| `POST /removebg`        | Background removal → transparent PNG              |
-| `POST /removebg/batch`  | Batch background removal (up to 10 images)        |
-| `POST /beats`           | Detect BPM and beat timestamps                    |
-| `POST /beat-sync`       | Sync clips to beats                               |
-| `POST /tts`             | Text-to-speech → MP3                              |
-| `POST /vocals/isolate`  | Vocals only                                       |
-| `POST /vocals/music`    | Accompaniment only                                |
-| `POST /upscale`         | Real-ESRGAN upscale                               |
-| `POST /track`           | Track an object → per-frame boxes                 |
-| `POST /translate`       | Translate text                                    |
-| `POST /subtitles/burn`  | Burn subtitles into a video                       |
-
-Full Swagger UI at http://localhost:8000/docs.
-
----
-
-## Project layout
+## Project Structure
 
 ```
 capfree/
-├── app/                  Next.js frontend
-│   ├── page.tsx            Landing page
-│   ├── layout.tsx          Root layout
-│   └── editor/             The editor: shell, panels, timeline helpers
-├── api/                  FastAPI backend (one module per capability)
-│   └── Dockerfile          Backend image
-├── Dockerfile            Frontend image
-└── docker-compose.yml    Both services
+├── app/                  # Next.js app router
+│   ├── page.tsx          # Landing page
+│   └── editor/           # Editor route
+├── components/           # React components
+│   ├── panels/           # Editor panels (Text, Captions, Effects…)
+│   └── editor/           # Timeline, toolbar, inspector
+├── backend/              # Python FastAPI ML backend
+│   ├── main.py
+│   └── routes/           # /captions, /vocals, /upscale, /reframe…
+└── electron/             # Desktop app shell
 ```
+
+---
+
+## Roadmap
+
+- [x] Multi-track timeline
+- [x] AI auto-captions (Whisper)
+- [x] Vocal isolation (Demucs)
+- [x] Beat sync
+- [x] AI upscale (Real-ESRGAN)
+- [x] Auto reframe
+- [x] Desktop app (Electron)
+- [ ] GIF export
+- [ ] TTS voiceover
+- [ ] Speed curves
+- [ ] Collaboration / shared projects
+
+---
+
+## Contributing
+
+Pull requests are welcome. For major changes, open an issue first to discuss what you'd like to change.
+
+1. Fork the repo
+2. Create your branch: `git checkout -b feature/my-feature`
+3. Commit your changes: `git commit -m 'Add my feature'`
+4. Push to the branch: `git push origin feature/my-feature`
+5. Open a pull request
 
 ---
 
 ## License
 
-MIT.
+MIT © 2026 [CapFree](https://github.com/Ziko67890/capfree)
 
-The Elah editor engine is Apache-2.0. The ML models carry their own licences — check
-Whisper, Demucs, Real-ESRGAN and rembg before shipping commercially.
+---
+
+<div align="center">
+Built by <a href="https://github.com/Ziko67890">Ziko67890</a>
+</div>

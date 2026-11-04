@@ -31,7 +31,7 @@ export function AvatarPanel() {
               key={avatar.id}
               type="button"
               onClick={() => setPicked(avatar.id)}
-              className={`rounded-md bg-[#1e1e24] p-1 ${picked === avatar.id ? "ring-2 ring-[#00d4b4]" : ""}`}
+              className={`rounded-md bg-[#1e1e24] p-1 ${picked === avatar.id ? "ring-2 ring-[#ffffff]" : ""}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={PORTRAITS[index]} alt={avatar.name} className="w-full rounded object-cover" style={{ aspectRatio: "3 / 4" }} />
@@ -54,7 +54,7 @@ export function AvatarPanel() {
               key={item}
               type="button"
               onClick={() => setVoice(item)}
-              className={`rounded-full px-2 py-1 text-[11px] ${voice === item ? "bg-[#00d4b4] text-black" : "bg-[#2a2a30] text-white"}`}
+              className={`rounded-full px-2 py-1 text-[11px] ${voice === item ? "bg-[#ffffff] text-black" : "bg-[#2a2a30] text-white"}`}
             >
               {item}
             </button>

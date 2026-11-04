@@ -182,7 +182,7 @@ export function TimelineBar({ fps }: TimelineBarProps) {
                   for (const hit of videos) engine.setClipSpeed(hit.clip.id, hit.trackId, next);
                   report(null);
                 }}
-                className="w-full accent-[#00d4b4]"
+                className="w-full accent-[#ffffff]"
               />
             </label>
           ) : (
@@ -203,7 +203,7 @@ export function TimelineBar({ fps }: TimelineBarProps) {
                   previewVolume(next);
                 }}
                 onPointerUp={() => engine.commitInteraction("Volume")}
-                className="w-full accent-[#00d4b4]"
+                className="w-full accent-[#ffffff]"
               />
             </label>
           )}

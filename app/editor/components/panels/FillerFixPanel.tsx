@@ -133,14 +133,14 @@ export function FillerFixPanel({ fps }: { fps: number }) {
                     checked={picked.has(key)}
                     aria-label={hit.word}
                     onChange={() => toggle(key)}
-                    className="accent-[#00d4b4]"
+                    className="accent-[#ffffff]"
                   />
                   <span className="flex-1 truncate">{hit.word}</span>
                   <button
                     type="button"
                     onClick={() => seekFrame(detection.offsetFrames + hit.start * fps)}
                     title="Jump to this word"
-                    className="font-mono text-[10px] text-[#888899] transition-colors duration-150 hover:text-[#00d4b4]"
+                    className="font-mono text-[10px] text-[#888899] transition-colors duration-150 hover:text-[#ffffff]"
                   >
                     {stamp(hit.start)}
                   </button>

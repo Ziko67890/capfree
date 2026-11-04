@@ -157,7 +157,7 @@ export function TranslatePanel({ fps }: { fps: number }) {
         onChange={(event) => setDraft(event.target.value)}
         placeholder="One line per subtitle"
         rows={5}
-        className="capfree-scroll mt-2 w-full resize-y rounded-md border border-[#2a2a30] bg-[#1a1a1e] p-2 text-[12px] leading-snug text-white outline-none transition-colors duration-150 placeholder:text-[#888899] focus:border-[#00d4b4]"
+        className="capfree-scroll mt-2 w-full resize-y rounded-md border border-[#2a2a30] bg-[#1a1a1e] p-2 text-[12px] leading-snug text-white outline-none transition-colors duration-150 placeholder:text-[#888899] focus:border-[#ffffff]"
       />
 
       <div className="mt-2">

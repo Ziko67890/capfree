@@ -46,7 +46,7 @@ function Equalizer() {
       {[5, 9, 6, 11, 7].map((height, index) => (
         <span
           key={index}
-          className="capfree-eq w-[2px] rounded-sm bg-[#00d4aa]"
+          className="capfree-eq w-[2px] rounded-sm bg-[#ffffff]"
           style={{ height: `${height}px` }}
         />
       ))}
@@ -84,7 +84,7 @@ function TrackRow({
         type="button"
         onClick={onToggle}
         aria-label={playing ? `Pause ${item.title}` : `Play ${item.title}`}
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#3a3a3a] text-white transition-colors duration-150 hover:border-[#00d4aa] hover:text-[#00d4aa]"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#3a3a3a] text-white transition-colors duration-150 hover:border-[#ffffff] hover:text-[#ffffff]"
       >
         {playing ? <Pause className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3 fill-current" />}
       </button>
@@ -93,7 +93,7 @@ function TrackRow({
         onClick={onAdd}
         disabled={adding}
         aria-label={`Add ${item.title} at the playhead`}
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#00d4aa] text-black transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#ffffff] text-black transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
       >
         {adding ? <Spinner /> : <Plus className="h-3.5 w-3.5" />}
       </button>
@@ -280,7 +280,7 @@ export function AudioPanel() {
             type="button"
             disabled={uploading}
             onClick={() => fileRef.current?.click()}
-            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md bg-[#00d4aa] text-[12px] font-semibold text-black transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md bg-[#ffffff] text-[12px] font-semibold text-black transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
           >
             {uploading ? <Spinner /> : <Upload className="h-3.5 w-3.5" />}
             Upload Audio
@@ -297,7 +297,7 @@ export function AudioPanel() {
             className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border text-[12px] font-semibold transition-colors duration-150 disabled:opacity-50 ${
               recording
                 ? "border-red-500 bg-red-500/15 text-red-300"
-                : "border-[#3a3a3a] bg-[#2a2a2a] text-white hover:border-[#00d4aa]"
+                : "border-[#3a3a3a] bg-[#2a2a2a] text-white hover:border-[#ffffff]"
             }`}
           >
             {recorder.state === "saving" ? (
@@ -322,7 +322,7 @@ export function AudioPanel() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search sounds"
             aria-label="Search sounds"
-            className="h-8 w-full rounded-md border border-[#3a3a3a] bg-[#2a2a2a] pl-7 pr-2 text-[12px] text-white outline-none transition-colors duration-150 placeholder:text-[#8a8a8a] focus:border-[#00d4aa]"
+            className="h-8 w-full rounded-md border border-[#3a3a3a] bg-[#2a2a2a] pl-7 pr-2 text-[12px] text-white outline-none transition-colors duration-150 placeholder:text-[#8a8a8a] focus:border-[#ffffff]"
           />
         </div>
 
@@ -335,7 +335,7 @@ export function AudioPanel() {
               onClick={() => setTab(item)}
               className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors duration-150 ${
                 tab === item
-                  ? "bg-[#00d4aa] font-semibold text-black"
+                  ? "bg-[#ffffff] font-semibold text-black"
                   : "bg-[#2a2a2a] text-[#c8c8c8] hover:text-white"
               }`}
             >

@@ -43,7 +43,7 @@ export function HighlightsPanel({ fps }: { fps: number }) {
                   return next;
                 })
               }
-              className="accent-[#00d4b4]"
+              className="accent-[#ffffff]"
             />
             <span className="min-w-0 flex-1">
               <span className="flex justify-between text-[12px] text-white">
@@ -53,7 +53,7 @@ export function HighlightsPanel({ fps }: { fps: number }) {
                 </span>
               </span>
               <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-[#111114]">
-                <span className="block h-full bg-[#00d4b4]" style={{ width: `${item.score}%` }} />
+                <span className="block h-full bg-[#ffffff]" style={{ width: `${item.score}%` }} />
               </span>
             </span>
             <span className="text-[10px] text-[#888899]">{item.score}</span>
@@ -63,7 +63,7 @@ export function HighlightsPanel({ fps }: { fps: number }) {
       <button
         type="button"
         onClick={addLocal}
-        className="mt-3 h-8 w-full rounded-md bg-[#00d4b4] text-[12px] font-semibold text-black"
+        className="mt-3 h-8 w-full rounded-md bg-[#ffffff] text-[12px] font-semibold text-black"
       >
         Add to timeline
       </button>

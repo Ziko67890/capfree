@@ -88,7 +88,7 @@ export function StickersPanel({ fps }: StickersPanelProps) {
           <button
             type="button"
             onClick={() => setRetry((count) => count + 1)}
-            className="rounded-md bg-[#00d4b4] px-3 py-1.5 text-[12px] font-semibold text-black"
+            className="rounded-md bg-[#ffffff] px-3 py-1.5 text-[12px] font-semibold text-black"
           >
             Retry
           </button>
@@ -103,7 +103,7 @@ export function StickersPanel({ fps }: StickersPanelProps) {
               type="button"
               disabled={busy === sticker.id}
               onClick={() => void add(sticker)}
-              className="flex flex-col gap-1 overflow-hidden rounded-md bg-[#2a2a30] p-0.5 text-white transition duration-150 hover:scale-[1.04] hover:border hover:border-[#00d4b4] disabled:opacity-50"
+              className="flex flex-col gap-1 overflow-hidden rounded-md bg-[#2a2a30] p-0.5 text-white transition duration-150 hover:scale-[1.04] hover:border hover:border-[#ffffff] disabled:opacity-50"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={sticker.preview} alt={sticker.title} className="aspect-square w-full object-contain" />

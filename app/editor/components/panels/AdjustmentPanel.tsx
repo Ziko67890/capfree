@@ -163,7 +163,7 @@ export function AdjustmentPanel({ fps }: AdjustmentPanelProps) {
         <button
           type="button"
           onClick={() => setSplit((current) => !current)}
-          className={`h-8 rounded-md text-[12px] transition-colors duration-150 ${split ? "bg-[#00d4b4] text-black" : "bg-[#2a2a30] text-white"}`}
+          className={`h-8 rounded-md text-[12px] transition-colors duration-150 ${split ? "bg-[#ffffff] text-black" : "bg-[#2a2a30] text-white"}`}
         >
           Before ↔ After
         </button>
@@ -206,7 +206,7 @@ export function AdjustmentPanel({ fps }: AdjustmentPanelProps) {
                 {LABELS[key]}
                 <span className="flex items-center gap-2">
                   <span className="font-mono text-[#888899]">{values[key]}</span>
-                  <button type="button" className="text-[10px] text-[#00d4b4]" onClick={() => write({ ...values, [key]: 0 })}>
+                  <button type="button" className="text-[10px] text-[#ffffff]" onClick={() => write({ ...values, [key]: 0 })}>
                     Reset
                   </button>
                 </span>
@@ -219,7 +219,7 @@ export function AdjustmentPanel({ fps }: AdjustmentPanelProps) {
                 value={values[key]}
                 aria-label={LABELS[key]}
                 onChange={(event) => write({ ...values, [key]: Number(event.target.value) })}
-                className="w-full accent-[#00d4b4]"
+                className="w-full accent-[#ffffff]"
               />
             </label>
           ))}

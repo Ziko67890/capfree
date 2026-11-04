@@ -26,6 +26,83 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ---------------------------------------------------------------------------
+   Editor accent — monochrome.
+
+   @elah/editor's utilities (border-ed-accent, text-ed-accent-dim,
+   bg-ed-accent-soft) read these variables, but the stylesheet we import,
+   @elah/editor/styles.css, only defines the utilities — the values live in the
+   package's tokens.css, which is not exported. So they resolved to nothing.
+   Declaring the accent group here makes every SDK highlight white instead of
+   the package's cyan default.
+
+   Only accent, selection and stage are set. The surface, border, text and
+   per-clip-type colours are deliberately left alone: clip colours encode clip
+   type, and the dark surfaces stay as they are.
+   --------------------------------------------------------------------------- */
+:root {
+  --elah-accent: #ffffff;
+  --elah-accent-hover: #e6e6e6;
+  --elah-accent-dim: #ffffff;
+  --elah-accent-glow: rgba(255, 255, 255, 0.35);
+  --elah-accent-soft: rgba(255, 255, 255, 0.12);
+  --elah-accent-text: #000000;
+
+  --elah-selection-border: #ffffff;
+  --elah-selection-glow: rgba(255, 255, 255, 0.4);
+  --elah-selection-color: #ffffff;
+
+  --elah-stage-border: rgba(255, 255, 255, 0.45);
+  --elah-stage-glow: 0 0 20px rgba(255, 255, 255, 0.08);
+}
+
+/* ---------------------------------------------------------------------------
+   Landing page theme.
+
+   Scoped to the landing root rather than :root so the editor, which imports
+   @elah/editor/styles.css and runs permanently dark, is never affected. Dark
+   follows the system unless data-theme pins it either way.
+   --------------------------------------------------------------------------- */
+.capfree-landing {
+  --bg: #ffffff;
+  --bg2: #f7f7f7;
+  --fg: #0a0a0a;
+  --fg2: #444444;
+  --fg3: #888888;
+  --border: #e5e5e5;
+  --accent: #000000;
+  --accent-fg: #ffffff;
+  --radius: 10px;
+
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .capfree-landing {
+    --bg: #0a0a0a;
+    --bg2: #141414;
+    --fg: #f5f5f5;
+    --fg2: #aaaaaa;
+    --fg3: #666666;
+    --border: #2a2a2a;
+    --accent: #ffffff;
+    --accent-fg: #000000;
+  }
+}
+
+html[data-theme="dark"] .capfree-landing {
+  --bg: #0a0a0a;
+  --bg2: #141414;
+  --fg: #f5f5f5;
+  --fg2: #aaaaaa;
+  --fg3: #666666;
+  --border: #2a2a2a;
+  --accent: #ffffff;
+  --accent-fg: #000000;
+}
+
 /* SourcePanel draws its own Media/Elements tabs. The top toolbar owns navigation. */
 .capfree-source > div:first-child {
   display: none;
@@ -95,8 +172,8 @@ body {
   to { transform: scale(1.15); }
 }
 @keyframes capfree-neon {
-  0%, 100% { filter: drop-shadow(0 0 2px #00d4b4); }
-  50% { filter: drop-shadow(0 0 10px #00d4b4); }
+  0%, 100% { filter: drop-shadow(0 0 2px #ffffff); }
+  50% { filter: drop-shadow(0 0 10px #ffffff); }
 }
 @keyframes capfree-tilt {
   from { transform: perspective(240px) rotateY(0deg); }

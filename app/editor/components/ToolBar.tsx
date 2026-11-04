@@ -80,13 +80,13 @@ export function ToolBar({ tab, onTab }: ToolBarProps) {
             type="button"
             onClick={() => onTab(item.id)}
             className={`flex w-[88px] shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-1 transition-colors duration-150 ${
-              active ? "border-[#00d4b4] text-white" : "border-transparent text-[#aaaaaa] hover:text-white"
+              active ? "border-[#ffffff] text-white" : "border-transparent text-[#aaaaaa] hover:text-white"
             }`}
           >
             <Icon className="h-4 w-4" />
             <span className="text-[11px] leading-none">{item.label}</span>
             {item.exclusive ? (
-              <span className="mt-0.5 rounded-[6px] bg-[#00d4b4] px-1.5 py-px text-[8px] font-semibold leading-none text-black">
+              <span className="mt-0.5 rounded-[6px] bg-[#ffffff] px-1.5 py-px text-[8px] font-semibold leading-none text-black">
                 ✦ Exclusive
               </span>
             ) : (

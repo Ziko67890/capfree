@@ -101,7 +101,7 @@ export function ExportModal({ onClose }: ExportModalProps) {
                   onClick={() => setResolution(r)}
                   className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                     resolution === r
-                      ? "bg-[#00d4b4] text-black border-[#00d4b4]"
+                      ? "bg-[#ffffff] text-black border-[#ffffff]"
                       : "bg-transparent text-[#888] border-[#2a2a2e] hover:border-[#444]"
                   }`}
                 >
@@ -123,7 +123,7 @@ export function ExportModal({ onClose }: ExportModalProps) {
               </div>
               <div className="h-1.5 bg-[#2a2a2e] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#00d4b4] rounded-full transition-all duration-150"
+                  className="h-full bg-[#ffffff] rounded-full transition-all duration-150"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -131,7 +131,7 @@ export function ExportModal({ onClose }: ExportModalProps) {
           )}
 
           {state === "done" && (
-            <p className="text-sm text-[#00d4b4]">Download started!</p>
+            <p className="text-sm text-[#ffffff]">Download started!</p>
           )}
 
           {state === "error" && (
@@ -159,7 +159,7 @@ export function ExportModal({ onClose }: ExportModalProps) {
               <button
                 onClick={handleExport}
                 disabled={state === "done"}
-                className="flex-1 py-2 rounded-xl bg-[#00d4b4] text-black text-sm font-semibold hover:bg-[#00bba3] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="flex-1 py-2 rounded-xl bg-[#ffffff] text-black text-sm font-semibold hover:bg-[#e6e6e6] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 <Download className="w-4 h-4" />
                 {state === "done" ? "Exported" : "Export"}

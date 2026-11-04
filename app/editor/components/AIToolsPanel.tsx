@@ -114,12 +114,12 @@ export function AIToolsPanel({ fps }: AIToolsPanelProps) {
             type="button"
             onClick={tool.onClick}
             disabled={busy !== null}
-            className="flex items-center gap-2 w-full px-2.5 py-2 rounded-md bg-[#1c1c1f] border border-[#2a2a2e] text-left text-[12px] text-white hover:border-[#00d4b4] disabled:opacity-50 disabled:hover:border-[#2a2a2e] transition-colors"
+            className="flex items-center gap-2 w-full px-2.5 py-2 rounded-md bg-[#1c1c1f] border border-[#2a2a2e] text-left text-[12px] text-white hover:border-[#ffffff] disabled:opacity-50 disabled:hover:border-[#2a2a2e] transition-colors"
           >
             {spinning ? (
-              <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#00d4b4]" />
+              <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#ffffff]" />
             ) : (
-              <Icon className="w-3.5 h-3.5 shrink-0 text-[#00d4b4]" />
+              <Icon className="w-3.5 h-3.5 shrink-0 text-[#ffffff]" />
             )}
             {tool.label}
           </button>
@@ -143,21 +143,21 @@ export function AIToolsPanel({ fps }: AIToolsPanelProps) {
           type="button"
           onClick={() => musicInputRef.current?.click()}
           disabled={busy !== null}
-          className="flex items-center gap-2 w-full px-2.5 py-2 rounded-md bg-[#1c1c1f] border border-[#2a2a2e] text-left text-[12px] text-white hover:border-[#00d4b4] disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 w-full px-2.5 py-2 rounded-md bg-[#1c1c1f] border border-[#2a2a2e] text-left text-[12px] text-white hover:border-[#ffffff] disabled:opacity-50 transition-colors"
         >
-          <Music2 className="w-3.5 h-3.5 shrink-0 text-[#00d4b4]" />
+          <Music2 className="w-3.5 h-3.5 shrink-0 text-[#ffffff]" />
           <span className="truncate">{music ? music.name : "Choose music"}</span>
         </button>
         <button
           type="button"
           onClick={() => void run("beats", beatSync)}
           disabled={busy !== null}
-          className="flex items-center gap-2 w-full px-2.5 py-2 rounded-md bg-[#1c1c1f] border border-[#2a2a2e] text-left text-[12px] text-white hover:border-[#00d4b4] disabled:opacity-50 disabled:hover:border-[#2a2a2e] transition-colors"
+          className="flex items-center gap-2 w-full px-2.5 py-2 rounded-md bg-[#1c1c1f] border border-[#2a2a2e] text-left text-[12px] text-white hover:border-[#ffffff] disabled:opacity-50 disabled:hover:border-[#2a2a2e] transition-colors"
         >
           {busy === "beats" ? (
-            <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#00d4b4]" />
+            <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#ffffff]" />
           ) : (
-            <Scissors className="w-3.5 h-3.5 shrink-0 text-[#00d4b4]" />
+            <Scissors className="w-3.5 h-3.5 shrink-0 text-[#ffffff]" />
           )}
           Beat Sync
         </button>

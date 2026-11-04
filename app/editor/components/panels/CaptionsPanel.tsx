@@ -24,9 +24,9 @@ const STYLES = [
   {
     id: "karaoke",
     label: "Karaoke",
-    className: "text-[#00d4b4] underline decoration-2",
+    className: "text-[#ffffff] underline decoration-2",
     sample: "SING WITH ME",
-    text: { fontSize: 56, color: "#00d4b4", fontFamily: "Inter", fontWeight: "bold" as const },
+    text: { fontSize: 56, color: "#ffffff", fontFamily: "Inter", fontWeight: "bold" as const },
   },
   {
     id: "minimal",
@@ -45,7 +45,7 @@ const STYLES = [
   {
     id: "lower",
     label: "Lower third",
-    className: "border-l-4 border-[#00d4b4] pl-2 text-left text-white",
+    className: "border-l-4 border-[#ffffff] pl-2 text-left text-white",
     sample: "Jane Doe",
     text: { fontSize: 44, color: "#ffffff", fontFamily: "Inter", fontWeight: "bold" as const },
   },
@@ -169,7 +169,7 @@ export function CaptionsPanel({ fps }: { fps: number }) {
               key={item.id}
               type="button"
               onClick={() => setStyleId(item.id)}
-              className={`rounded-md bg-[#0d0d0f] px-2 py-3 text-center ${styleId === item.id ? "ring-2 ring-[#00d4b4]" : ""}`}
+              className={`rounded-md bg-[#0d0d0f] px-2 py-3 text-center ${styleId === item.id ? "ring-2 ring-[#ffffff]" : ""}`}
             >
               <span className={item.className}>{item.sample}</span>
               <span className="mt-1 block text-[10px] text-[#888899]">{item.label}</span>
@@ -209,7 +209,7 @@ export function CaptionsPanel({ fps }: { fps: number }) {
                     type="button"
                     onClick={() => seekFrame(transcript.offsetFrames + line.start * fps)}
                     title="Jump to this line"
-                    className="shrink-0 font-mono text-[10px] text-[#00d4b4] transition-colors duration-150 hover:text-white"
+                    className="shrink-0 font-mono text-[10px] text-[#ffffff] transition-colors duration-150 hover:text-white"
                   >
                     {stamp(line.start)}
                   </button>
@@ -218,7 +218,7 @@ export function CaptionsPanel({ fps }: { fps: number }) {
                     type="button"
                     onClick={() => addLine(line)}
                     title="Add this line to the timeline"
-                    className="shrink-0 rounded bg-[#2a2a30] px-1.5 py-0.5 text-[10px] transition-colors duration-150 hover:bg-[#00d4b4] hover:text-black"
+                    className="shrink-0 rounded bg-[#2a2a30] px-1.5 py-0.5 text-[10px] transition-colors duration-150 hover:bg-[#ffffff] hover:text-black"
                   >
                     Add
                   </button>

@@ -57,7 +57,7 @@ export function FiltersPanel() {
             type="button"
             onClick={() => gradeClip(preset.id)}
             title={`${preset.label} — applies to the selected clip`}
-            className="flex-1 overflow-hidden rounded-md ring-offset-1 ring-offset-[#111114] transition-all duration-150 hover:ring-2 hover:ring-[#00d4b4]"
+            className="flex-1 overflow-hidden rounded-md ring-offset-1 ring-offset-[#111114] transition-all duration-150 hover:ring-2 hover:ring-[#ffffff]"
           >
             <span className="block h-7 w-full" style={{ background: preset.swatch }} />
             <span className="block bg-[#2a2a30] py-0.5 text-[9px] leading-tight text-white">{preset.label}</span>
@@ -74,7 +74,7 @@ export function FiltersPanel() {
               type="button"
               onClick={() => apply(card.name, card.css)}
               className={`relative overflow-hidden rounded-md bg-[#2a2a30] transition-colors duration-150 ${
-                active ? "ring-2 ring-[#00d4b4]" : "hover:ring-1 hover:ring-[#00d4b4]"
+                active ? "ring-2 ring-[#ffffff]" : "hover:ring-1 hover:ring-[#ffffff]"
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -102,7 +102,7 @@ export function FiltersPanel() {
           value={intensity}
           aria-label="Filter intensity"
           onChange={(event) => setLevel(Number(event.target.value))}
-          className="w-full accent-[#00d4b4]"
+          className="w-full accent-[#ffffff]"
         />
       </label>
     </PanelBody>

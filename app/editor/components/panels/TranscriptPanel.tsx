@@ -129,7 +129,7 @@ export function TranscriptPanel({ fps, active }: { fps: number; active: boolean 
 
     for (const node of root.querySelectorAll<HTMLElement>("[data-word-id]")) {
       const on = node.dataset.wordId === activeId;
-      node.classList.toggle("bg-[#00d4b4]", on);
+      node.classList.toggle("bg-[#ffffff]", on);
       node.classList.toggle("text-black", on);
       node.classList.toggle("rounded-sm", on);
       if (on) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -336,7 +336,7 @@ export function TranscriptPanel({ fps, active }: { fps: number; active: boolean 
                   key={`${line.id}:${revision}`}
                   className="mb-1.5 rounded-md bg-[#1e1e24] px-2 py-1.5"
                 >
-                  <span className="mb-0.5 block font-mono text-[9px] text-[#00d4b4]">
+                  <span className="mb-0.5 block font-mono text-[9px] text-[#ffffff]">
                     {stamp(from)} – {stamp(to)}
                   </span>
                   <div
@@ -350,7 +350,7 @@ export function TranscriptPanel({ fps, active }: { fps: number; active: boolean 
                     onInput={captureDraft}
                     onBlur={commitDrafts}
                     onClick={seekToWord}
-                    className="text-[12px] leading-relaxed text-white outline-none focus:ring-1 focus:ring-[#00d4b4]"
+                    className="text-[12px] leading-relaxed text-white outline-none focus:ring-1 focus:ring-[#ffffff]"
                   >
                     {kept.map((word) => (
                       <span

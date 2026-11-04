@@ -48,7 +48,7 @@ export function EffectsPanel() {
               key={preset.id}
               type="button"
               onClick={() => applyToClip(preset.id)}
-              className="rounded-md bg-[#2a2a30] px-2 py-2.5 text-[11px] text-white transition-colors duration-150 hover:bg-[#00d4b4] hover:text-black"
+              className="rounded-md bg-[#2a2a30] px-2 py-2.5 text-[11px] text-white transition-colors duration-150 hover:bg-[#ffffff] hover:text-black"
             >
               {preset.label}
             </button>
@@ -81,7 +81,7 @@ export function EffectsPanel() {
               toast(`${card.name} applied`);
             }}
             className={`group relative overflow-hidden rounded-md bg-black text-left ${
-              look.activeEffect === card.name ? "ring-2 ring-[#00d4b4]" : "hover:ring-1 hover:ring-[#00d4b4]"
+              look.activeEffect === card.name ? "ring-2 ring-[#ffffff]" : "hover:ring-1 hover:ring-[#ffffff]"
             }`}
             style={{ aspectRatio: "2 / 3" }}
           >

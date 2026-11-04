@@ -23,7 +23,7 @@ import { useToast } from "../toast";
 const TEXT_COLORS = [
   "#ffffff",
   "#000000",
-  "#00d4b4",
+  "#ffffff",
   "#ffd166",
   "#ef476f",
   "#118ab2",
@@ -152,7 +152,7 @@ export function TextPanel({ fps }: TextPanelProps) {
     const clip = currentText() ?? placeTextClip(engine, fps, "Text");
     if (name === "Outline") engine.updateClip(clip.id, clip.trackId, { textOutline: { color: "#000000", width: 6 } });
     else if (name === "Shadow") engine.updateClip(clip.id, clip.trackId, { textShadow: { color: "#000000", blur: 0, offsetX: 4, offsetY: 4 } });
-    else if (name === "Glow") engine.updateClip(clip.id, clip.trackId, { textShadow: { color: "#00d4b4", blur: 18, offsetX: 0, offsetY: 0 } });
+    else if (name === "Glow") engine.updateClip(clip.id, clip.trackId, { textShadow: { color: "#ffffff", blur: 18, offsetX: 0, offsetY: 0 } });
     else if (name === "3D") engine.updateClip(clip.id, clip.trackId, { textShadow: { color: "#222228", blur: 0, offsetX: 6, offsetY: 6 }, fontWeight: "bold" });
     else if (name === "Gradient") engine.updateClip(clip.id, clip.trackId, { color: "#7cf6e4", textOutline: { color: "#0b3d36", width: 2 } });
     else {
@@ -208,7 +208,7 @@ export function TextPanel({ fps }: TextPanelProps) {
 
   const chipClass = (on: boolean) =>
     `h-7 flex-1 rounded-md border text-[11px] text-white transition-colors duration-150 ${
-      on ? "border-[#00d4b4] bg-[#1e1e24]" : "border-[#3a3a40] bg-[#1a1a1e] hover:border-[#00d4b4]"
+      on ? "border-[#ffffff] bg-[#1e1e24]" : "border-[#3a3a40] bg-[#1a1a1e] hover:border-[#ffffff]"
     }`;
 
   return (
@@ -259,7 +259,7 @@ export function TextPanel({ fps }: TextPanelProps) {
                     patch({ fontSize: Number(event.currentTarget.value) });
                     engine.commitInteraction("Text size");
                   }}
-                  className="w-full accent-[#00d4b4]"
+                  className="w-full accent-[#ffffff]"
                 />
               </label>
 
@@ -276,7 +276,7 @@ export function TextPanel({ fps }: TextPanelProps) {
                         aria-pressed={on}
                         onClick={() => patch({ color: colour })}
                         style={{ background: colour }}
-                        className={`h-6 w-full rounded border ${on ? "border-[#00d4b4]" : "border-[#3a3a40]"}`}
+                        className={`h-6 w-full rounded border ${on ? "border-[#ffffff]" : "border-[#3a3a40]"}`}
                       />
                     );
                   })}
@@ -384,7 +384,7 @@ export function TextPanel({ fps }: TextPanelProps) {
                 key={preset.id}
                 type="button"
                 onClick={() => applyPreset(preset)}
-                className="flex h-[80px] items-center justify-center overflow-hidden rounded-md bg-[#0d0d0f] px-1 transition duration-150 hover:ring-1 hover:ring-[#00d4b4]"
+                className="flex h-[80px] items-center justify-center overflow-hidden rounded-md bg-[#0d0d0f] px-1 transition duration-150 hover:ring-1 hover:ring-[#ffffff]"
               >
                 <span className={preset.cardClass}>
                   {preset.sample}

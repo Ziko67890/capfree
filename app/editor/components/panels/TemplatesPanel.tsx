@@ -100,7 +100,7 @@ export function TemplatesPanel({ fps }: TemplatesPanelProps) {
             <button
               type="button"
               onClick={() => applyTemplate(open)}
-              className="mt-3 h-9 w-full rounded-md bg-[#00d4b4] text-[13px] font-semibold text-black"
+              className="mt-3 h-9 w-full rounded-md bg-[#ffffff] text-[13px] font-semibold text-black"
             >
               Use template
             </button>

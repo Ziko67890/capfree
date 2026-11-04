@@ -21,7 +21,7 @@ export function SearchField({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className="h-8 w-full rounded-md border border-[#2a2a30] bg-[#1a1a1e] px-2 text-[12px] text-white outline-none transition-colors duration-150 placeholder:text-[#888899] focus:border-[#00d4b4]"
+      className="h-8 w-full rounded-md border border-[#2a2a30] bg-[#1a1a1e] px-2 text-[12px] text-white outline-none transition-colors duration-150 placeholder:text-[#888899] focus:border-[#ffffff]"
     />
   );
 }
@@ -42,7 +42,7 @@ export function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled || busy}
-      className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#00d4b4] text-[12px] font-semibold text-black transition-colors duration-150 hover:bg-[#00e6c4] disabled:opacity-50"
+      className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#ffffff] text-[12px] font-semibold text-black transition-colors duration-150 hover:bg-[#e6e6e6] disabled:opacity-50"
     >
       {busy && <Spinner />}
       {children}
@@ -64,7 +64,7 @@ export function QuietButton({
   const color =
     tone === "danger"
       ? "border-red-900 bg-red-700 text-white hover:bg-red-600"
-      : "border-[#2a2a30] bg-[#2a2a30] text-white hover:border-[#00d4b4]";
+      : "border-[#2a2a30] bg-[#2a2a30] text-white hover:border-[#ffffff]";
   return (
     <button
       type="button"
@@ -98,7 +98,7 @@ export function TealSwitch({
       className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left text-[12px] text-white transition-colors duration-150 disabled:opacity-50"
     >
       <span>{label}</span>
-      <span className={`h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors duration-150 ${checked ? "bg-[#00d4b4]" : "bg-[#3a3a42]"}`}>
+      <span className={`h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors duration-150 ${checked ? "bg-[#ffffff]" : "bg-[#3a3a42]"}`}>
         <span className={`block h-4 w-4 rounded-full bg-white transition-transform duration-150 ${checked ? "translate-x-4" : ""}`} />
       </span>
     </button>

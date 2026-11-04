@@ -58,7 +58,7 @@ function SliderRow({
         onChange={(event) => onChange(Number(event.target.value))}
         onPointerUp={(event) => onCommit(Number(event.currentTarget.value))}
         onBlur={(event) => onCommit(Number(event.currentTarget.value))}
-        className="w-full accent-[#00d4b4]"
+        className="w-full accent-[#ffffff]"
       />
     </label>
   );
@@ -304,7 +304,7 @@ function InspectorFields({
                 aria-pressed={on}
                 onClick={() => commitSpeed(preset)}
                 className={`h-7 rounded-md border text-[11px] text-white transition-colors duration-150 ${
-                  on ? "border-[#00d4b4] bg-[#1e1e24]" : "border-[#3a3a40] bg-[#1a1a1e] hover:border-[#00d4b4]"
+                  on ? "border-[#ffffff] bg-[#1e1e24]" : "border-[#3a3a40] bg-[#1a1a1e] hover:border-[#ffffff]"
                 }`}
               >
                 {preset}x
@@ -338,8 +338,8 @@ function InspectorFields({
         onClick={toggleReverse}
         className={`flex h-8 items-center justify-center gap-1 rounded-md border text-[11px] text-white transition-colors duration-150 disabled:opacity-40 ${
           reversed
-            ? "border-[#00d4b4] bg-[#1e1e24]"
-            : "border-[#3a3a40] bg-[#1a1a1e] hover:border-[#00d4b4]"
+            ? "border-[#ffffff] bg-[#1e1e24]"
+            : "border-[#3a3a40] bg-[#1a1a1e] hover:border-[#ffffff]"
         }`}
       >
         <Rewind className="h-3.5 w-3.5" aria-hidden />
@@ -356,7 +356,7 @@ function InspectorFields({
             type="button"
             disabled={freezing}
             onClick={freezeHere}
-            className="flex h-8 items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] text-[11px] text-white transition-colors duration-150 hover:border-[#00d4b4] disabled:opacity-40"
+            className="flex h-8 items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] text-[11px] text-white transition-colors duration-150 hover:border-[#ffffff] disabled:opacity-40"
           >
             <Snowflake className="h-3.5 w-3.5" aria-hidden />
             {freezing ? "Freezing…" : "Freeze here"}
@@ -374,7 +374,7 @@ function InspectorFields({
         <button
           type="button"
           onClick={() => flip("scaleX")}
-          className="flex h-8 items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] text-[11px] text-white hover:border-[#00d4b4]"
+          className="flex h-8 items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] text-[11px] text-white hover:border-[#ffffff]"
         >
           <FlipHorizontal2 className="h-3.5 w-3.5" />
           Flip H
@@ -382,7 +382,7 @@ function InspectorFields({
         <button
           type="button"
           onClick={() => flip("scaleY")}
-          className="flex h-8 items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] text-[11px] text-white hover:border-[#00d4b4]"
+          className="flex h-8 items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] text-[11px] text-white hover:border-[#ffffff]"
         >
           <FlipVertical2 className="h-3.5 w-3.5" />
           Flip V
@@ -521,7 +521,7 @@ function InspectorFields({
           if (!result.ok) toast("Move the playhead inside the clip.", "error");
           else toast("Clip split");
         }}
-        className="h-8 rounded-md border border-[#2a2a30] bg-[#2a2a30] text-[12px] text-white transition-colors duration-150 hover:border-[#00d4b4]"
+        className="h-8 rounded-md border border-[#2a2a30] bg-[#2a2a30] text-[12px] text-white transition-colors duration-150 hover:border-[#ffffff]"
       >
         Split at Playhead
       </button>

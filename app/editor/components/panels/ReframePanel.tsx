@@ -25,7 +25,7 @@ export function ReframePanel({ active }: { active: boolean }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={SAMPLE_PHOTO_WIDE} alt="Reframe preview" className="h-28 w-full object-cover" />
         <span
-          className="pointer-events-none absolute border-2 border-[#00d4b4]"
+          className="pointer-events-none absolute border-2 border-[#ffffff]"
           style={{
             left: `${crop.x * 100}%`,
             top: `${crop.y * 100}%`,
@@ -40,7 +40,7 @@ export function ReframePanel({ active }: { active: boolean }) {
             key={item}
             type="button"
             onClick={() => setRatio(item)}
-            className={`h-8 flex-1 rounded-md text-[12px] ${ratio === item ? "bg-[#00d4b4] text-black" : "bg-[#2a2a30] text-white"}`}
+            className={`h-8 flex-1 rounded-md text-[12px] ${ratio === item ? "bg-[#ffffff] text-black" : "bg-[#2a2a30] text-white"}`}
           >
             {item}
           </button>

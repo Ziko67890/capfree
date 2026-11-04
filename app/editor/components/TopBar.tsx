@@ -12,7 +12,7 @@ export function TopBar({ onExport }: TopBarProps) {
     <header className="flex items-center h-12 px-4 border-b border-[#222] bg-[#111113] flex-shrink-0 gap-4">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-1.5 flex-shrink-0">
-        <div className="w-7 h-7 rounded-md bg-[#00d4b4] flex items-center justify-center">
+        <div className="w-7 h-7 rounded-md bg-[#ffffff] flex items-center justify-center">
           <Scissors className="w-4 h-4 text-black" />
         </div>
         <span className="text-sm font-bold tracking-tight text-white hidden sm:inline">CapFree</span>
@@ -40,7 +40,7 @@ export function TopBar({ onExport }: TopBarProps) {
 
         <button
           onClick={onExport}
-          className="flex items-center gap-1.5 px-3 h-8 rounded-md bg-[#00d4b4] text-black text-sm font-semibold hover:bg-[#00bba3] transition-colors"
+          className="flex items-center gap-1.5 px-3 h-8 rounded-md bg-[#ffffff] text-black text-sm font-semibold hover:bg-[#e6e6e6] transition-colors"
         >
           <Download className="w-3.5 h-3.5" />
           Export

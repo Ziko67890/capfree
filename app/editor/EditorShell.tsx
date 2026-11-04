@@ -147,7 +147,7 @@ function EditorInner() {
             )}
             {look.reframe && (
               <div
-                className="pointer-events-none absolute border-2 border-[#00d4b4]"
+                className="pointer-events-none absolute border-2 border-[#ffffff]"
                 style={{
                   left: `${look.reframe.x * 100}%`,
                   top: `${look.reframe.y * 100}%`,
