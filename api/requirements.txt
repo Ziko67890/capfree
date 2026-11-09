@@ -2,6 +2,9 @@ fastapi
 uvicorn[standard]
 python-multipart
 faster-whisper
+# faster-whisper 1.2.x calls av.open(metadata_errors=...), which av 14+ removed.
+# Without this cap its own "av>=11" resolves to av 19 and /captions 500s.
+av<14
 rembg[cpu]
 pillow
 librosa
@@ -10,3 +13,7 @@ realesrgan
 # CSRT, KCF, and MOSSE ship in the contrib build, not in opencv-python.
 opencv-contrib-python
 deep-translator
+# Reads the API keys for the /music and /media proxies out of .env.
+python-dotenv
+# Used by the /music proxy to reach Openverse and the track hosts.
+requests

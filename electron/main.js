@@ -60,14 +60,27 @@ function apiOrigin() {
 
 /**
  * Pinned to what the editor actually loads: Google Fonts for the text presets,
- * Unsplash and Giphy for the panel thumbnails, Mixkit for the audio previews,
- * blob: for imported media and the worker modules the renderer starts.
+ * Unsplash and Pixabay for the panel thumbnails, Pixabay for the stock clips,
+ * Mixkit and the royalty-free music hosts for the audio previews, blob: for
+ * imported media and the worker modules the renderer starts.
  *
  * `'unsafe-inline'` for script is unavoidable here — Next inlines its bootstrap
  * and flight payload as <script> tags, and a static export has no server to
  * mint a per-response nonce. Dev additionally needs eval and a websocket for
  * hot reload, so that stays out of the packaged policy.
  */
+// The Music panel streams its previews straight from the host Openverse names,
+// so these need to be playable. They are not in connect-src: the bytes for the
+// timeline come through the API's /music/download proxy instead, which is what
+// keeps the hosts' missing CORS headers from breaking the import.
+const MUSIC_HOSTS = [
+  "https://*.jamendo.com",
+  "https://*.freesound.org",
+  "https://*.ccmixter.org",
+  "https://ccmixter.org",
+  "https://upload.wikimedia.org",
+];
+
 function buildCsp({ dev }) {
   const api = apiOrigin();
   // The audio panel fetches the Mixkit previews rather than streaming them from
@@ -77,8 +90,9 @@ function buildCsp({ dev }) {
     "data:",
     "blob:",
     api,
-    "https://api.giphy.com",
     "https://assets.mixkit.co",
+    // Pixabay is deliberately absent: stock clips come through the API's
+    // /media/proxy-video, because the CDN sends no CORS header at all.
   ];
   if (dev) connect.push("ws://localhost:*", "http://localhost:*");
 
@@ -87,8 +101,8 @@ function buildCsp({ dev }) {
     `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://images.unsplash.com https://*.giphy.com",
-    "media-src 'self' data: blob: https://assets.mixkit.co",
+    "img-src 'self' data: blob: https://images.unsplash.com https://cdn.pixabay.com https://pixabay.com",
+    `media-src 'self' data: blob: https://assets.mixkit.co ${MUSIC_HOSTS.join(' ')}`,
     `connect-src ${connect.join(" ")}`,
     "worker-src 'self' blob:",
     "object-src 'none'",

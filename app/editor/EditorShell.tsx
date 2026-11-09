@@ -33,8 +33,10 @@ import { RestoreBanner } from "./components/RestoreBanner";
 import { ExportModal } from "./components/ExportModal";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { LeftPanel } from "./components/LeftPanel";
+import { PromptBar } from "./components/PromptBar";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { TimelineBar } from "./components/TimelineBar";
+import { SettingsModal } from "./components/SettingsModal";
 import { ToolBar, type EditorTab } from "./components/ToolBar";
 import { TopBar } from "./components/TopBar";
 import { PreviewLookProvider, usePreviewLook } from "./previewLook";
@@ -45,6 +47,7 @@ const FPS = 30;
 function EditorInner() {
   const previewRef = useRef<PreviewHandle>(null);
   const [showExport, setShowExport] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState<EditorTab>("media");
   const engine = useTimelineEngine();
   const toast = useToast();
@@ -112,7 +115,7 @@ function EditorInner() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#1a1a1e] text-white">
-      <TopBar onExport={() => setShowExport(true)} />
+      <TopBar onExport={() => setShowExport(true)} onSettings={() => setShowSettings(true)} />
       {pending && (
         <RestoreBanner save={pending} onRestore={restoreSession} onDiscard={discardSession} />
       )}
@@ -175,6 +178,8 @@ function EditorInner() {
         <InspectorPanel fps={FPS} />
       </div>
 
+      <PromptBar fps={FPS} />
+
       <div className="flex shrink-0 flex-col border-t border-[#34343a] bg-[#1a1a1e]" style={{ height: 252 }}>
         <TimelineBar fps={FPS} />
         <div className="min-h-0 flex-1" data-capfree-timeline>
@@ -183,6 +188,7 @@ function EditorInner() {
       </div>
 
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 }

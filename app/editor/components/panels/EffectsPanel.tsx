@@ -6,7 +6,7 @@ import { EFFECT_PRESETS } from "../../catalog";
 import { applyEffectPreset, clearClipEffects } from "../../clipEdit";
 import { EFFECT_LOOKS, SAMPLE_PHOTO_TALL } from "../../visuals";
 import { usePreviewLook } from "../../previewLook";
-import { PanelBody, QuietButton, SearchField, SubTabs } from "../chrome";
+import { EmptyNote, PanelBody, QuietButton, SearchField, SubTabs } from "../chrome";
 import { useToast } from "../toast";
 
 const MODES = ["Preview look", "Clip effect"] as const;
@@ -71,6 +71,7 @@ export function EffectsPanel() {
       <div className="mb-2">
         <SearchField value={query} onChange={setQuery} placeholder="Search effects" />
       </div>
+      {cards.length === 0 && <EmptyNote text={`No effect matches "${query.trim()}".`} />}
       <div className="grid grid-cols-2 gap-1.5">
         {cards.map((card) => (
           <button

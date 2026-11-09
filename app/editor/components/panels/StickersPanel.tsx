@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { useTimelineEngine } from "@elah/editor";
+import { searchStickers, type StockSticker } from "../../api";
 import { addImageUrl } from "../../placeMedia";
-import { fetchStickers, STICKER_CATEGORIES, type GiphySticker } from "../../visuals";
-import { CategoryLayout, EmptyNote, SearchField, SkeletonGrid } from "../chrome";
+import { STICKER_CATEGORIES, STICKER_QUERY } from "../../visuals";
+import { CategoryLayout, EmptyNote, SearchField, SkeletonGrid, Spinner } from "../chrome";
 import { useToast } from "../toast";
 
 interface StickersPanelProps {
@@ -13,7 +15,7 @@ interface StickersPanelProps {
 
 interface StickerResult {
   token: string;
-  items: GiphySticker[];
+  items: StockSticker[];
   error: string | null;
 }
 
@@ -32,8 +34,8 @@ export function StickersPanel({ fps }: StickersPanelProps) {
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  const cacheKey = debounced ? `search:${debounced}` : category;
-  const token = `${cacheKey}#${retry}`;
+  const term = debounced || STICKER_QUERY[category] || category;
+  const token = `${term}#${retry}`;
 
   // Loading is derived, not stored: anything older than the current token is
   // still in flight, so the effect only ever writes state asynchronously.
@@ -43,11 +45,11 @@ export function StickersPanel({ fps }: StickersPanelProps) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchStickers(cacheKey)
+    searchStickers(term)
       .then((items) => {
         if (!cancelled) setResult({ token, items, error: null });
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (cancelled) return;
         setResult({
           token,
@@ -58,14 +60,14 @@ export function StickersPanel({ fps }: StickersPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, token]);
+  }, [term, token]);
 
-  async function add(sticker: GiphySticker) {
+  async function add(sticker: StockSticker) {
     setBusy(sticker.id);
     try {
-      const id = await addImageUrl(engine, sticker.full, sticker.title, fps * 3);
+      const id = await addImageUrl(engine, sticker.url, sticker.name, fps * 3);
       if (!id) toast("Could not add that sticker.", "error");
-      else toast(`${sticker.title} added`);
+      else toast(`${sticker.name} added`);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Could not add that sticker.", "error");
     } finally {
@@ -96,21 +98,36 @@ export function StickersPanel({ fps }: StickersPanelProps) {
       ) : stickers.length === 0 ? (
         <EmptyNote text="No stickers in this category." />
       ) : (
-        <div className="grid grid-cols-4 gap-1.5">
-          {stickers.map((sticker) => (
-            <button
-              key={sticker.id}
-              type="button"
-              disabled={busy === sticker.id}
-              onClick={() => void add(sticker)}
-              className="flex flex-col gap-1 overflow-hidden rounded-md bg-[#2a2a30] p-0.5 text-white transition duration-150 hover:scale-[1.04] hover:border hover:border-[#ffffff] disabled:opacity-50"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={sticker.preview} alt={sticker.title} className="aspect-square w-full object-contain" />
-              <span className="line-clamp-1 px-0.5 text-center text-[9px] text-[#c8c8ce]">{sticker.title}</span>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-4 gap-1.5">
+            {stickers.map((sticker) => (
+              <div
+                key={sticker.id}
+                className="group relative overflow-hidden rounded-md bg-[#2a2a30] p-0.5 transition duration-150 hover:ring-1 hover:ring-[#ffffff]"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={sticker.previewUrl}
+                  alt={sticker.name}
+                  loading="lazy"
+                  className="aspect-square w-full object-contain"
+                />
+                <button
+                  type="button"
+                  disabled={busy === sticker.id}
+                  onClick={() => void add(sticker)}
+                  aria-label={`Add ${sticker.name} to the canvas`}
+                  className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-[#ffffff] text-black opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-50"
+                >
+                  {busy === sticker.id ? <Spinner /> : <Plus className="h-3 w-3" />}
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-center text-[9px] leading-snug text-[#888899]">
+            Pixabay — free for commercial use, no credit required
+          </p>
+        </>
       )}
     </CategoryLayout>
   );

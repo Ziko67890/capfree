@@ -26,10 +26,6 @@ export const PORTRAITS = [
   "https://images.unsplash.com/photo-1531746020798-e6953c6c8e3a?w=200&h=260&fit=crop",
 ];
 
-export const GIPHY_KEY = "dc6zaTOxFJmzC";
-/** Giphy sample key used when the public beta key is rejected. */
-const GIPHY_FALLBACK_KEY = "GlVGYHkr3WSBnllca54iNt0yFbjz7L65";
-
 export const STICKER_CATEGORIES = [
   "Trending",
   "Halloween",
@@ -52,8 +48,8 @@ export const STICKER_CATEGORIES = [
   "Kawaii",
 ] as const;
 
-export const STICKER_QUERY: Record<string, string | "trending"> = {
-  Trending: "trending",
+export const STICKER_QUERY: Record<string, string> = {
+  Trending: "sticker",
   Halloween: "halloween",
   B_Duck: "duck cute",
   "Pumpkin Spice": "pumpkin",
@@ -73,66 +69,6 @@ export const STICKER_QUERY: Record<string, string | "trending"> = {
   Gaming: "gaming",
   Kawaii: "kawaii",
 };
-
-export interface GiphySticker {
-  id: string;
-  title: string;
-  preview: string;
-  full: string;
-}
-
-const stickerCache = new Map<string, GiphySticker[]>();
-
-function readGiphy(payload: unknown): GiphySticker[] {
-  if (!payload || typeof payload !== "object" || !("data" in payload)) return [];
-  const rows = (payload as { data: unknown }).data;
-  if (!Array.isArray(rows)) return [];
-  return rows.flatMap((row) => {
-    if (!row || typeof row !== "object") return [];
-    const item = row as {
-      id?: string;
-      title?: string;
-      images?: Record<string, { url?: string } | undefined>;
-    };
-    const images = item.images ?? {};
-    const preview =
-      images.downsized?.url ||
-      images.fixed_width_small?.url ||
-      images.preview_gif?.url ||
-      images.original?.url;
-    const full = images.original?.url || images.downsized?.url || preview;
-    if (!item.id || !preview || !full) return [];
-    const title = (item.title ?? "Sticker").replace(/\s+GIF$/i, "").trim() || "Sticker";
-    return [{ id: item.id, title, preview, full }];
-  });
-}
-
-export async function fetchStickers(key: string): Promise<GiphySticker[]> {
-  const cached = stickerCache.get(key);
-  if (cached) return cached;
-  const query = key.startsWith("search:") ? key.slice(7) : STICKER_QUERY[key];
-  if (!query) return [];
-  const path =
-    query === "trending"
-      ? "https://api.giphy.com/v1/stickers/trending"
-      : `https://api.giphy.com/v1/stickers/search?q=${encodeURIComponent(query)}`;
-  const joiner = path.includes("?") ? "&" : "?";
-  const keys = [GIPHY_FALLBACK_KEY, GIPHY_KEY];
-  let stickers: GiphySticker[] | null = null;
-  for (const apiKey of keys) {
-    try {
-      const response = await fetch(`${path}${joiner}api_key=${apiKey}&limit=24&rating=g`);
-      if (!response.ok) continue;
-      stickers = readGiphy(await response.json());
-      break;
-    } catch {
-      /* 403 responses may omit CORS headers and throw; try the next key. */
-    }
-  }
-  if (!stickers) throw new Error("Giphy could not load stickers");
-  stickerCache.set(key, stickers);
-  return stickers;
-}
 
 export interface FilterLook {
   name: string;

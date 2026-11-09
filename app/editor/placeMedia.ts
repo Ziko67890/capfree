@@ -1,4 +1,5 @@
 import { importBlob, importUrl, insertMediaAsset, playbackStore, type TimelineEngine } from "@elah/editor";
+import { requestStockVideo } from "./api";
 import { selectClip } from "./clipEdit";
 
 /** Short preview tone so a catalog card can land on the timeline as a real audio clip. */
@@ -107,6 +108,34 @@ export async function addAudioBlob(
     ...(startFrame === undefined ? {} : { desiredStartFrame: startFrame }),
     ...(targetTrackId === undefined ? {} : { targetTrackId }),
   });
+  if (!result.ok || result.clipIds.length === 0) return null;
+  engine.updateClip(result.clipIds[0], result.trackId, { name });
+  selectClip(result.clipIds[0]);
+  return result.clipIds[0];
+}
+
+/**
+ * Drops a stock clip onto the timeline at the playhead, keeping the source's
+ * own duration. The bytes come through the API's proxy rather than a direct
+ * fetch: cdn.pixabay.com sends no CORS header, so the renderer cannot read it.
+ * Going through the proxy also means the engine owns the bytes, which is what
+ * keeps an export reproducible.
+ *
+ * A failure is left to propagate. Falling back to the SDK's URL loader would
+ * only hide a broken proxy behind a clip that silently never decodes.
+ */
+export async function addVideoUrl(
+  engine: TimelineEngine,
+  url: string,
+  name: string,
+): Promise<string | null> {
+  const startFrame = playbackStore.getState().currentFrame;
+  const blob = await requestStockVideo(url);
+  const type = blob.type && blob.type.startsWith("video/") ? blob.type : "video/mp4";
+  const file = new File([blob], `${name}.mp4`, { type });
+  const asset = await importBlob(file, { name, kind: "video" });
+
+  const result = await insertMediaAsset(engine, asset.id, { desiredStartFrame: startFrame });
   if (!result.ok || result.clipIds.length === 0) return null;
   engine.updateClip(result.clipIds[0], result.trackId, { name });
   selectClip(result.clipIds[0]);

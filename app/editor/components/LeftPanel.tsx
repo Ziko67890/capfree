@@ -14,6 +14,7 @@ import { FillerFixPanel } from "./panels/FillerFixPanel";
 import { FiltersPanel } from "./panels/FiltersPanel";
 import { HighlightsPanel } from "./panels/HighlightsPanel";
 import { MediaPanel } from "./panels/MediaPanel";
+import { MusicPanel } from "./panels/MusicPanel";
 import { ReframePanel } from "./panels/ReframePanel";
 import { StickersPanel } from "./panels/StickersPanel";
 import { TemplatesPanel } from "./panels/TemplatesPanel";
@@ -43,6 +44,7 @@ export function LeftPanel({ tab, fps, onAssetActivate }: LeftPanelProps) {
     <aside className="relative w-[280px] shrink-0 overflow-hidden border-r border-[#2a2a30] bg-[#111114]">
       <Pane active={tab === "media"}><MediaPanel onAssetActivate={onAssetActivate} /></Pane>
       <Pane active={tab === "audio"}><AudioPanel /></Pane>
+      <Pane active={tab === "music"}><MusicPanel /></Pane>
       <Pane active={tab === "text"}><TextPanel fps={fps} /></Pane>
       <Pane active={tab === "stickers"}><StickersPanel fps={fps} /></Pane>
       <Pane active={tab === "effects"}><EffectsPanel /></Pane>

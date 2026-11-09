@@ -2,14 +2,27 @@ import os
 import subprocess
 import tempfile
 from functools import lru_cache
+from pathlib import Path
 from typing import Optional
+
+from dotenv import load_dotenv
+
+# Loaded before anything reads os.getenv. The keys live in the project root's
+# .env next to Next's copy, so uvicorn started from api/ still finds them;
+# override=False means a real environment variable always wins.
+for _env in (Path(__file__).resolve().parent / ".env", Path(__file__).resolve().parent.parent / ".env"):
+    if _env.is_file():
+        load_dotenv(_env, override=False)
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
+from ai import router as ai_router
 from beats import router as beats_router
 from fillers import router as fillers_router
+from media import router as media_router
+from music import router as music_router
 from removebg import router as removebg_router
 from silence import router as silence_router
 from tracking import router as tracking_router
@@ -34,6 +47,9 @@ app.add_middleware(
 
 app.include_router(silence_router)
 app.include_router(fillers_router)
+app.include_router(music_router)
+app.include_router(media_router)
+app.include_router(ai_router)
 app.include_router(removebg_router)
 app.include_router(beats_router)
 app.include_router(tts_router)

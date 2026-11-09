@@ -104,7 +104,6 @@ def cut_segments(src: str, dst: str, segments_to_remove: list, duration: float, 
         raise HTTPException(500, "Failed to cut filler words from the video")
 
 
-@router.post("/fillers/detect")
 def _extra_words(raw: Optional[str]) -> Optional[list]:
     """Comma-separated words the caller wants treated as fillers."""
     if not raw:
@@ -135,6 +134,7 @@ def _chosen_segments(raw: str) -> list:
     return chosen
 
 
+@router.post("/fillers/detect")
 def fillers_detect(
     file: UploadFile = File(...),
     language: Optional[str] = Form(None),

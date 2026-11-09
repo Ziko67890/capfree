@@ -117,17 +117,22 @@ function InspectorFields({
   const toast = useToast();
   const look = usePreviewLook();
   const selected = useSelectedClip();
-  const [name, setName] = useState(selected?.clip.name ?? "");
-  const [nameSource, setNameSource] = useState(selected?.clip.name ?? "");
+  // For a text clip the field edits the words on screen; for anything else it
+  // edits the timeline label. Both live in this one input.
+  const labelOf = (hit: typeof selected) =>
+    hit ? (hit.clip.type === "text" ? (hit.clip.content ?? "") : hit.clip.name) : "";
+  const [name, setName] = useState(() => labelOf(selected));
+  const [nameSource, setNameSource] = useState("");
   const [filterLevel, setFilterLevel] = useState(100);
   const [freezing, setFreezing] = useState(false);
 
-  // Re-seed the name field whenever the clip, or its committed name, changes.
-  const committedName = selected?.clip.name ?? "";
-  const nameKey = `${selected?.clip.id ?? ""}:${committedName}`;
+  // Re-seed whenever the clip, or the value it is bound to, changes. Selecting
+  // a text clip on the timeline therefore shows its current words right away.
+  const committedLabel = labelOf(selected);
+  const nameKey = `${selected?.clip.id ?? ""}:${committedLabel}`;
   if (nameSource !== nameKey) {
     setNameSource(nameKey);
-    setName(committedName);
+    setName(committedLabel);
   }
   if (!selected || selected.clip.id !== clipId) return null;
   const { clip } = selected;
@@ -217,17 +222,48 @@ function InspectorFields({
     });
   }
 
+  const isText = clip.type === "text";
+
+  /**
+   * Commits the field. Emptying a text clip deletes it: a text clip with no
+   * words draws nothing, so leaving it behind would put an invisible,
+   * un-selectable block on the timeline.
+   */
+  function commitLabel() {
+    const value = name.trim();
+    if (isText) {
+      if (!value) {
+        engine.removeClip(clip.id, trackId);
+        toast("Empty text clip removed");
+        return;
+      }
+      // Name tracks the content so the timeline block stays recognisable.
+      engine.updateClip(clip.id, trackId, { content: value, name: value.slice(0, 40) });
+      return;
+    }
+    engine.updateClip(clip.id, trackId, { name: value || clip.type });
+  }
+
   return (
     <div className="mt-3 flex flex-col gap-3">
       <label className="text-[11px] text-[#c8c8ce]">
-        Name
+        {isText ? "Text" : "Name"}
         <input
           value={name}
-          aria-label="Clip name"
+          aria-label={isText ? "Text content" : "Clip name"}
+          placeholder={isText ? "Type text, or clear to delete" : undefined}
           onChange={(event) => setName(event.target.value)}
-          onBlur={() => engine.updateClip(clip.id, trackId, { name: name.trim() || clip.type })}
+          onBlur={commitLabel}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
           className={`${fieldClass} mt-1`}
         />
+        {isText && (
+          <span className="mt-1 block text-[10px] leading-snug text-[#888899]">
+            Clearing this removes the clip.
+          </span>
+        )}
       </label>
       <div className="grid grid-cols-2 gap-2">
         <label className="text-[11px] text-[#c8c8ce]">

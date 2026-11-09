@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Scissors, Download, Undo2, Redo2 } from "lucide-react";
+import { Scissors, Download, Settings, Undo2, Redo2 } from "lucide-react";
 
 interface TopBarProps {
   onExport: () => void;
+  onSettings: () => void;
 }
 
-export function TopBar({ onExport }: TopBarProps) {
+export function TopBar({ onExport, onSettings }: TopBarProps) {
   return (
     <header className="flex items-center h-12 px-4 border-b border-[#222] bg-[#111113] flex-shrink-0 gap-4">
       {/* Logo */}
@@ -36,6 +37,14 @@ export function TopBar({ onExport }: TopBarProps) {
           className="w-8 h-8 flex items-center justify-center rounded-md text-[#888] hover:text-white hover:bg-[#222] transition-colors"
         >
           <Redo2 className="w-4 h-4" />
+        </button>
+
+        <button
+          onClick={onSettings}
+          aria-label="Settings"
+          className="w-8 h-8 flex items-center justify-center rounded-md text-[#888] hover:text-white hover:bg-[#222] transition-colors"
+        >
+          <Settings className="w-4 h-4" />
         </button>
 
         <button

@@ -6,7 +6,7 @@ import { FILTER_PRESETS } from "../../catalog";
 import { applyFilterPreset } from "../../clipEdit";
 import { FILTER_LOOKS, SAMPLE_PHOTO, mixFilter } from "../../visuals";
 import { usePreviewLook } from "../../previewLook";
-import { PanelBody, SearchField } from "../chrome";
+import { EmptyNote, PanelBody, SearchField } from "../chrome";
 import { useToast } from "../toast";
 
 export function FiltersPanel() {
@@ -65,6 +65,7 @@ export function FiltersPanel() {
         ))}
       </div>
       <p className="mb-1 text-[11px] text-[#888899]">Preview look</p>
+      {cards.length === 0 && <EmptyNote text={`No filter matches "${query.trim()}".`} />}
       <div className="grid grid-cols-2 gap-1.5">
         {cards.map((card) => {
           const active = look.activeFilter === card.name;

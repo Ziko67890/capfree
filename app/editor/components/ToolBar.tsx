@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   Captions,
   Crop,
+  Disc3,
   FileText,
   Film,
   Globe,
@@ -25,6 +26,7 @@ import {
 export type EditorTab =
   | "media"
   | "audio"
+  | "music"
   | "text"
   | "stickers"
   | "effects"
@@ -45,6 +47,7 @@ export type EditorTab =
 const TABS: Array<{ id: EditorTab; label: string; icon: LucideIcon; exclusive?: boolean }> = [
   { id: "media", label: "Media", icon: Film },
   { id: "audio", label: "Audio", icon: Music },
+  { id: "music", label: "Music", icon: Disc3 },
   { id: "text", label: "Text", icon: Type },
   { id: "stickers", label: "Stickers", icon: Sticker },
   { id: "effects", label: "Effects", icon: Sparkles },
