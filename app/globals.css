@@ -401,3 +401,17 @@ html[data-theme="dark"] .capfree-landing {
   font-size: 11px;
   line-height: 1.35;
 }
+
+/* ---------------------------------------------------------------------------
+   Preview stage.
+
+   Preview runs its own ResizeObserver and calls renderer.resize with the
+   container's clientWidth/clientHeight, so the drawing buffer already tracks
+   this box and the stage fills it. object-fit only matters for the frame
+   between a container resize and that observer firing, where it keeps the
+   picture in proportion instead of stretching it. No !important needed: the
+   SDK sets the canvas width and height inline, never object-fit.
+   --------------------------------------------------------------------------- */
+.capfree-stage canvas {
+  object-fit: contain;
+}

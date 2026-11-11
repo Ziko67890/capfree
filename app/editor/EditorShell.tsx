@@ -26,6 +26,7 @@ import {
   readAutoSave,
   type AutoSave,
 } from "./autosave";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { consumeSticker } from "./stickerDrag";
 import { useSelectedClip } from "./useSelectedClip";
 import { useAutoSave } from "./useAutoSave";
@@ -44,10 +45,16 @@ import { ToastProvider, useToast } from "./components/toast";
 
 const FPS = 30;
 
+/** TimelineBar's own h-9, so collapsing leaves exactly that row showing. */
+const TIMELINE_BAR_HEIGHT = 36;
+/** Bar + ruler (32) + two 56px tracks, plus 40px of slack for a third. */
+const TIMELINE_HEIGHT = 220;
+
 function EditorInner() {
   const previewRef = useRef<PreviewHandle>(null);
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [tab, setTab] = useState<EditorTab>("media");
   const engine = useTimelineEngine();
   const toast = useToast();
@@ -128,10 +135,26 @@ function EditorInner() {
         <LeftPanel tab={tab} fps={FPS} onAssetActivate={handleAssetActivate} />
 
         <section className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-[#1a1a1e] px-4 py-4">
-          <div
-            className="relative w-full overflow-hidden rounded-lg bg-black shadow-2xl"
-            style={{ aspectRatio: "16/9", maxHeight: "calc(100% - 60px)", filter: previewFilter || undefined }}
-          >
+          {/*
+            The area the controls leave over. It is far wider than 16:9 -- on a
+            1080p window roughly 1368x616, an aspect of 2.2 -- so the stage box
+            has to be the largest 16:9 that fits inside it rather than the whole
+            thing. Preview's own ResizeObserver hands the renderer whatever this
+            box measures, and the renderer letterboxes the project's 16:9 stage
+            within that; so a full-width box meant the renderer drew the bars
+            itself, up to 276px a side, which read as a small picture in a big
+            black frame.
+
+            inset-0 with auto width/height, an aspect ratio and both max
+            constraints resolves to exactly that largest fitting box, and
+            margin:auto centres it. Now the box and the stage are the same
+            shape, so there are no bars and the frame hugs the picture.
+          */}
+          <div className="relative min-h-0 w-full flex-1">
+            <div
+              className="capfree-stage absolute inset-0 m-auto aspect-[16/9] max-h-full max-w-full overflow-hidden rounded-lg bg-black shadow-2xl"
+              style={{ filter: previewFilter || undefined }}
+            >
             <Preview
               ref={previewRef}
               className="h-full w-full"
@@ -163,6 +186,7 @@ function EditorInner() {
                 }}
               />
             )}
+            </div>
           </div>
           <PlaybackControls
             isPlaying={playback.isPlaying}
@@ -199,9 +223,46 @@ function EditorInner() {
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-col border-t border-[#34343a] bg-[#1a1a1e]" style={{ height: 252 }}>
-        <TimelineBar fps={FPS} />
-        <div className="min-h-0 flex-1" data-capfree-timeline>
+      {/*
+        220px expanded: the bar (36) plus the ruler (32) plus two 56px tracks
+        needs 180, so this keeps 40px of slack to show a third row starting.
+        Collapsed is exactly the bar's own h-9, so the row is never clipped.
+
+        The preview is limited by height rather than width, so this band is the
+        one dial that makes the picture bigger -- which is the whole point of
+        being able to fold it away.
+      */}
+      <div
+        className="flex shrink-0 flex-col overflow-hidden border-t border-[#34343a] bg-[#1a1a1e] transition-[height] duration-200 ease-out"
+        style={{ height: timelineCollapsed ? TIMELINE_BAR_HEIGHT : TIMELINE_HEIGHT }}
+      >
+        <div className="flex shrink-0 items-stretch">
+          <button
+            type="button"
+            onClick={() => setTimelineCollapsed((on) => !on)}
+            aria-expanded={!timelineCollapsed}
+            title={timelineCollapsed ? "Show tracks" : "Hide tracks"}
+            aria-label={timelineCollapsed ? "Show tracks" : "Hide tracks"}
+            className="flex w-7 shrink-0 items-center justify-center border-b border-r border-[#34343a] bg-[#2a2a2e] text-[#888] transition-colors hover:text-white"
+          >
+            {timelineCollapsed ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <div className="min-w-0 flex-1">
+            <TimelineBar fps={FPS} />
+          </div>
+        </div>
+        {/* Collapsed this is zero-height; the clips inside stay focusable
+            unless the box is taken out of the tab order too. */}
+        <div
+          className="min-h-0 flex-1 overflow-hidden"
+          data-capfree-timeline
+          aria-hidden={timelineCollapsed}
+          inert={timelineCollapsed}
+        >
           {/* compactSidebar suppresses both the track name and the
               eye/lock buttons in TrackRow, so it stays off for the labels to
               read "Video 1" / "Audio 1" with their controls. */}
