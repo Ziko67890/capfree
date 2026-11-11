@@ -23,6 +23,14 @@ export interface AdjustmentValues {
   saturation: number;
   sharpness: number;
   vignette: number;
+  /** Warm/cool, straight onto the grade's temperature. */
+  temperature: number;
+  tint: number;
+  /** Scales the whites, via the grade's gain. */
+  highlights: number;
+  /** Raises or crushes the blacks, via the grade's lift. */
+  shadows: number;
+  grain: number;
 }
 
 export function selectedClips(engine: TimelineEngine): LocatedClip[] {
@@ -146,6 +154,7 @@ export function readAdjustments(clip: Clip): AdjustmentValues {
   const grade = clip.effects?.find((effect) => effect.kind === "colorGrade");
   const blur = clip.effects?.find((effect) => effect.kind === "gaussianBlur");
   const vignette = clip.effects?.find((effect) => effect.kind === "vignette");
+  const grain = clip.effects?.find((effect) => effect.kind === "grain");
   const radius = numberParam(blur?.params.radius, 0);
   return {
     brightness: Math.round(numberParam(grade?.params.exposure, 0) * 100),
@@ -153,6 +162,11 @@ export function readAdjustments(clip: Clip): AdjustmentValues {
     saturation: Math.round((numberParam(grade?.params.saturation, 1) - 1) * 100),
     sharpness: radius > 0 ? -Math.round((radius / 24) * 100) : 0,
     vignette: Math.round(numberParam(vignette?.params.amount, 0) * 100),
+    temperature: Math.round(numberParam(grade?.params.temperature, 0) * 100),
+    tint: Math.round(numberParam(grade?.params.tint, 0) * 100),
+    highlights: Math.round((numberParam(grade?.params.gain, 1) - 1) * 200),
+    shadows: Math.round(numberParam(grade?.params.lift, 0) * 200),
+    grain: Math.round(numberParam(grain?.params.amount, 0) * 100),
   };
 }
 
@@ -171,7 +185,11 @@ export function adjustmentEffects(
   baseGamma: number,
 ): Effect[] {
   const kept = (existing ?? []).filter(
-    (effect) => effect.kind !== "colorGrade" && effect.kind !== "gaussianBlur" && effect.kind !== "vignette",
+    (effect) =>
+      effect.kind !== "colorGrade" &&
+      effect.kind !== "gaussianBlur" &&
+      effect.kind !== "vignette" &&
+      effect.kind !== "grain",
   );
   const previous = existing?.find((effect) => effect.kind === "colorGrade");
   const grade = previous
@@ -183,6 +201,11 @@ export function adjustmentEffects(
     contrast: clamp(1 + values.contrast / 100, 0, 2),
     saturation: clamp(1 + values.saturation / 100, 0, 2),
     gamma: values.sharpness > 0 ? clamp(1 - values.sharpness / 250, 0.2, 3) : baseGamma,
+    temperature: clamp(values.temperature / 100, -1, 1),
+    tint: clamp(values.tint / 100, -1, 1),
+    // gain spans 0..2 and lift -0.5..0.5, so a full slider is half a unit.
+    gain: clamp(1 + values.highlights / 200, 0, 2),
+    lift: clamp(values.shadows / 200, -0.5, 0.5),
   };
   const next: Effect[] = [...kept, grade];
   if (values.sharpness < 0) {
@@ -194,6 +217,11 @@ export function adjustmentEffects(
     const vignette = createEffect("vignette");
     vignette.params = { ...vignette.params, amount: clamp(values.vignette / 100, 0, 1) };
     next.push(vignette);
+  }
+  if (values.grain > 0) {
+    const grain = createEffect("grain");
+    grain.params = { ...grain.params, amount: clamp(values.grain / 100, 0, 1) };
+    next.push(grain);
   }
   return next;
 }

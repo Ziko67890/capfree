@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
+  Bot,
   Captions,
   Crop,
   Disc3,
@@ -14,7 +15,6 @@ import {
   Music,
   Palette,
   Scissors,
-  SlidersHorizontal,
   Sparkles,
   Star,
   Sticker,
@@ -27,13 +27,13 @@ export type EditorTab =
   | "media"
   | "audio"
   | "music"
+  | "ai"
   | "text"
   | "stickers"
   | "effects"
   | "transitions"
   | "captions"
   | "filters"
-  | "adjustment"
   | "templates"
   | "avatar"
   | "transcript"
@@ -46,6 +46,7 @@ export type EditorTab =
 
 const TABS: Array<{ id: EditorTab; label: string; icon: LucideIcon; exclusive?: boolean }> = [
   { id: "media", label: "Media", icon: Film },
+  { id: "ai", label: "AI", icon: Bot },
   { id: "audio", label: "Audio", icon: Music },
   { id: "music", label: "Music", icon: Disc3 },
   { id: "text", label: "Text", icon: Type },
@@ -54,7 +55,6 @@ const TABS: Array<{ id: EditorTab; label: string; icon: LucideIcon; exclusive?: 
   { id: "transitions", label: "Transitions", icon: ArrowLeftRight },
   { id: "captions", label: "Captions", icon: Captions },
   { id: "filters", label: "Filters", icon: Palette },
-  { id: "adjustment", label: "Adjustment", icon: SlidersHorizontal },
   { id: "templates", label: "Templates", icon: LayoutTemplate },
   { id: "avatar", label: "AI Avatar", icon: UserRound },
   { id: "transcript", label: "Transcript", icon: FileText, exclusive: true },
@@ -73,7 +73,7 @@ interface ToolBarProps {
 
 export function ToolBar({ tab, onTab }: ToolBarProps) {
   return (
-    <div className="capfree-scroll flex h-[76px] shrink-0 items-stretch overflow-x-auto border-b border-[#2a2a30] bg-[#111114]">
+    <div className="capfree-scroll flex h-[76px] shrink-0 items-stretch gap-2 overflow-x-auto border-b border-[#2a2a30] bg-[#111114] px-2">
       {TABS.map((item) => {
         const Icon = item.icon;
         const active = tab === item.id;
@@ -82,11 +82,11 @@ export function ToolBar({ tab, onTab }: ToolBarProps) {
             key={item.id}
             type="button"
             onClick={() => onTab(item.id)}
-            className={`flex w-[88px] shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-1 transition-colors duration-150 ${
-              active ? "border-[#ffffff] text-white" : "border-transparent text-[#aaaaaa] hover:text-white"
+            className={`flex w-[80px] shrink-0 flex-col items-center justify-center gap-1 border-b-2 px-1 transition-colors duration-150 ${
+              active ? "border-[#ffffff] text-white" : "border-transparent text-[#8f8f97] hover:text-white"
             }`}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-[18px] w-[18px]" />
             <span className="text-[11px] leading-none">{item.label}</span>
             {item.exclusive ? (
               <span className="mt-0.5 rounded-[6px] bg-[#ffffff] px-1.5 py-px text-[8px] font-semibold leading-none text-black">

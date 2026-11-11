@@ -27,13 +27,13 @@ import {
   type AutoSave,
 } from "./autosave";
 import { consumeSticker } from "./stickerDrag";
+import { useSelectedClip } from "./useSelectedClip";
 import { useAutoSave } from "./useAutoSave";
 import { useShortcuts } from "./useShortcuts";
 import { RestoreBanner } from "./components/RestoreBanner";
 import { ExportModal } from "./components/ExportModal";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { LeftPanel } from "./components/LeftPanel";
-import { PromptBar } from "./components/PromptBar";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { TimelineBar } from "./components/TimelineBar";
 import { SettingsModal } from "./components/SettingsModal";
@@ -62,6 +62,9 @@ function EditorInner() {
   const tracks = useTracks();
   const timeline = useTimeline();
   const look = usePreviewLook();
+  // The inspector is shown only while a clip is selected; deselecting gives the
+  // preview the space back.
+  const hasSelection = useSelectedClip() !== null;
   const previewFilter = [look.filterCss, look.effectCss, look.adjustCss].filter(Boolean).join(" ");
 
   const totalFrames = tracks.totalFrames;
@@ -175,15 +178,34 @@ function EditorInner() {
           />
         </section>
 
-        <InspectorPanel fps={FPS} />
-      </div>
+        {/*
+          Width animates rather than the panel unmounting: an element that is
+          gone cannot transition. The inner aside keeps its fixed 280px, so the
+          panel slides out of a clipping box instead of its contents reflowing
+          on every frame.
 
-      <PromptBar fps={FPS} />
+          Driven straight off the selection store via useSelectedClip, so there
+          is no second copy of "is something selected" to keep in step.
+        */}
+        <div
+          className="shrink-0 overflow-hidden transition-[width] duration-200 ease-out"
+          style={{ width: hasSelection ? 280 : 0 }}
+          aria-hidden={!hasSelection}
+          // A zero-width box still holds focusable inputs, so the collapsed
+          // panel is taken out of the tab order too, not just hidden.
+          inert={!hasSelection}
+        >
+          <InspectorPanel fps={FPS} />
+        </div>
+      </div>
 
       <div className="flex shrink-0 flex-col border-t border-[#34343a] bg-[#1a1a1e]" style={{ height: 252 }}>
         <TimelineBar fps={FPS} />
         <div className="min-h-0 flex-1" data-capfree-timeline>
-          <Timeline className="h-full" compactSidebar />
+          {/* compactSidebar suppresses both the track name and the
+              eye/lock buttons in TrackRow, so it stays off for the labels to
+              read "Video 1" / "Audio 1" with their controls. */}
+          <Timeline className="h-full" compactSidebar={false} />
         </div>
       </div>
 

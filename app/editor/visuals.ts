@@ -171,7 +171,7 @@ export const TRANSITION_LOOKS: TransitionLook[] = [
   { name: "Wipe Right", cls: "capfree-tr-wipe-r", kind: "wipe", direction: "right" },
   { name: "Zoom In", cls: "capfree-tr-zoomin", kind: "zoom" },
   { name: "Zoom Out", cls: "capfree-tr-zoomout", kind: "zoom" },
-  { name: "Slide", cls: "capfree-tr-slide-l", kind: "slide", direction: "left" },
+  { name: "Slide Left", cls: "capfree-tr-slide-l", kind: "slide", direction: "left" },
   { name: "Fade White", cls: "capfree-tr-white", kind: "fade" },
   { name: "Slide Right", cls: "capfree-tr-slide-r", kind: "slide", direction: "right" },
   { name: "Slide Up", cls: "capfree-tr-slide-u", kind: "slide", direction: "up" },

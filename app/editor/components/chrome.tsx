@@ -21,7 +21,7 @@ export function SearchField({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className="h-8 w-full rounded-md border border-[#2a2a30] bg-[#1a1a1e] px-2 text-[12px] text-white outline-none transition-colors duration-150 placeholder:text-[#888899] focus:border-[#ffffff]"
+      className="h-9 w-full rounded-md border border-[#2a2a30] bg-[#1a1a1e] px-2.5 text-[12px] text-white outline-none transition-colors duration-150 placeholder:text-[#888899] focus:border-[#ffffff]"
     />
   );
 }
@@ -70,7 +70,7 @@ export function QuietButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex h-8 w-full items-center justify-center gap-2 rounded-md border text-[12px] transition-colors duration-150 disabled:opacity-50 ${color}`}
+      className={`flex h-9 w-full items-center justify-center gap-2 rounded-md border text-[12px] transition-colors duration-150 disabled:opacity-50 ${color}`}
     >
       {children}
     </button>
@@ -150,7 +150,7 @@ export function CategoryLayout({
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#111114]">
       {header}
-      {search && <div className="shrink-0 px-2 pb-1 pt-2">{search}</div>}
+      {search && <div className="shrink-0 px-3 pb-2 pt-3">{search}</div>}
       <div className="flex min-h-0 flex-1">
         <nav className="capfree-scroll h-full w-[104px] shrink-0 overflow-y-auto border-r border-[#2a2a30] py-1">
           {categories.map((item) => (
@@ -166,7 +166,7 @@ export function CategoryLayout({
             </button>
           ))}
         </nav>
-        <div className="capfree-scroll min-h-0 flex-1 overflow-y-auto p-2">{children}</div>
+        <div className="capfree-scroll min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
       </div>
     </div>
   );
@@ -177,7 +177,7 @@ export function EmptyNote({ text = "No content" }: { text?: string }) {
 }
 
 export function PanelBody({ children }: { children: ReactNode }) {
-  return <div className="capfree-scroll h-full overflow-y-auto bg-[#111114] p-2">{children}</div>;
+  return <div className="capfree-scroll h-full overflow-y-auto bg-[#111114] p-3">{children}</div>;
 }
 
 export function PreviewBanner() {

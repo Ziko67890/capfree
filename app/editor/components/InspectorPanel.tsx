@@ -1,22 +1,62 @@
 "use client";
 
-import { useState } from "react";
-import { FlipHorizontal2, FlipVertical2, Rewind, Snowflake } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  Eraser,
+  FlipHorizontal2,
+  FlipVertical2,
+  MousePointerClick,
+  Rewind,
+  Snowflake,
+  X,
+} from "lucide-react";
 import { applySpeedPreset, clearSpeedRemap, hasTimeRemap, matchSpeedPreset } from "@elah/core";
-import { framesToTimecode, splitClipAtPlayhead, useTimelineEngine, type Transform } from "@elah/editor";
+import {
+  framesToSeconds,
+  framesToTimecode,
+  splitClipAtPlayhead,
+  useTimelineEngine,
+  type Transform,
+} from "@elah/editor";
+import {
+  cancelRemoveVideoBg,
+  requestRemoveVideoBg,
+  requestRemoveVideoBgResult,
+  requestRemoveVideoBgStatus,
+} from "../api";
 import { playheadFrame } from "../captionActions";
 import { deleteSelection, withTransform } from "../clipEdit";
 import { freezeFrameAt } from "../freezeFrame";
+import { fileFromClip, replaceClipFile } from "../timelineMedia";
 import { FONT_LIST, FILTER_LOOKS, mixFilter } from "../visuals";
+import { SubTabs } from "./chrome";
 import { fieldClass } from "./panelUi";
 import { useToast } from "./toast";
 import { useSelectedClip } from "../useSelectedClip";
 import { usePreviewLook } from "../previewLook";
 
+/**
+ * Marks a clip whose background has been cut. The SDK's Timeline draws the clip
+ * name and offers no badge slot of its own -- `labelColor` is declared on Clip
+ * but nothing in the editor reads it -- so the name carries the marker there,
+ * and the Inspector shows a proper badge.
+ */
+const NO_BG_PREFIX = "No BG · ";
+
+/** How often the removal job is polled while it runs. */
+const BG_POLL_MS = 1500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 /** The range engine.setClipSpeed enforces; mirrored so the UI cannot lie. */
 const MIN_SPEED = 0.25;
 const MAX_SPEED = 4;
 const SPEED_PRESETS = [0.25, 0.5, 1, 1.5, 2, 4];
+/** Video clips get these three groups; audio and text have too few to split. */
+const CLIP_TABS = ["Basic", "Speed", "Transform"] as const;
+
 /** Longer fades than this belong on the timeline, not in a sidebar slider. */
 const MAX_FADE_SEC = 5;
 
@@ -79,11 +119,14 @@ export function InspectorPanel({ fps }: { fps: number }) {
   }
 
   return (
-    <aside className="capfree-scroll w-[260px] shrink-0 overflow-y-auto border-l border-[#2a2a30] bg-[#111114]">
+    <aside className="capfree-scroll h-full w-[280px] shrink-0 overflow-y-auto border-l border-[#2a2a30] bg-[#111114]">
       <div className="px-3 py-3">
         <h2 className="text-[13px] font-semibold text-white">Inspector</h2>
         {!selected ? (
-          <p className="mt-3 text-[12px] leading-snug text-[#888899]">Select a clip to edit</p>
+          <div className="mt-6 flex flex-col items-center gap-2 text-center">
+            <MousePointerClick className="h-4 w-4 text-[#888899]" aria-hidden />
+            <p className="text-[12px] leading-snug text-[#888899]">Select a clip to edit</p>
+          </div>
         ) : (
           <InspectorFields
             fps={fps}
@@ -125,6 +168,9 @@ function InspectorFields({
   const [nameSource, setNameSource] = useState("");
   const [filterLevel, setFilterLevel] = useState(100);
   const [freezing, setFreezing] = useState(false);
+  const [tab, setTab] = useState<string>("Basic");
+  const [bgLabel, setBgLabel] = useState<string | null>(null);
+  const bgCancelled = useRef(false);
 
   // Re-seed whenever the clip, or the value it is bound to, changes. Selecting
   // a text clip on the timeline therefore shows its current words right away.
@@ -189,6 +235,81 @@ function InspectorFields({
       .finally(() => setFreezing(false));
   }
 
+  /**
+   * Cuts the background off this clip and swaps the result in.
+   *
+   * Polled rather than awaited in one request: rembg is ~1.2-2.6s a frame on
+   * CPU, so this is minutes of work, and the server caps it at 30s of source.
+   * A clip longer than that comes back shortened, which the toast says plainly.
+   */
+  async function removeBackground() {
+    if (bgLabel !== null) return;
+    bgCancelled.current = false;
+    setBgLabel("Uploading…");
+    let jobId: string | null = null;
+    try {
+      const source = await fileFromClip(clip);
+      const job = await requestRemoveVideoBg(source, "u2net");
+      jobId = job.jobId;
+      setBgLabel(`Removing background… 0/${job.framesTotal}`);
+
+      let settled = null as Awaited<ReturnType<typeof requestRemoveVideoBgStatus>> | null;
+      while (!bgCancelled.current) {
+        await sleep(BG_POLL_MS);
+        if (bgCancelled.current) break;
+        const status = await requestRemoveVideoBgStatus(job.jobId);
+        if (status.status === "error") throw new Error(status.error ?? "Background removal failed");
+        if (status.status === "done") {
+          settled = status;
+          break;
+        }
+        const eta =
+          status.etaSeconds !== null && status.etaSeconds > 0
+            ? ` · ~${Math.ceil(status.etaSeconds / 60)} min left`
+            : "";
+        setBgLabel(
+          status.status === "encoding"
+            ? "Encoding transparent video…"
+            : `Removing background… ${status.framesDone}/${status.framesTotal}${eta}`,
+        );
+      }
+
+      if (bgCancelled.current || !settled) return;
+
+      setBgLabel("Importing…");
+      const blob = await requestRemoveVideoBgResult(job.jobId);
+      const base = clip.name.startsWith(NO_BG_PREFIX)
+        ? clip.name.slice(NO_BG_PREFIX.length)
+        : clip.name;
+      // WebM, not MP4: H.264 has no alpha pixel format, so the transparent
+      // render is VP9. The importer detects its alpha and flags the asset.
+      const file = new File([blob], `${NO_BG_PREFIX}${base}.webm`, { type: "video/webm" });
+      await replaceClipFile(engine, { clip, trackId }, file, "video", fps);
+      engine.updateClip(clip.id, trackId, { name: `${NO_BG_PREFIX}${base}` });
+
+      const shortened = job.secondsProcessed + 0.5 < framesToSeconds(clip.durationFrames, fps);
+      toast(
+        shortened
+          ? `Background removed — first ${job.secondsProcessed.toFixed(1)}s only, at ${job.outputFps}fps`
+          : `Background removed at ${job.outputFps}fps`,
+      );
+    } catch (error: unknown) {
+      if (jobId) void cancelRemoveVideoBg(jobId);
+      toast(
+        error instanceof Error ? error.message : "Could not remove the background.",
+        "error",
+      );
+    } finally {
+      setBgLabel(null);
+    }
+  }
+
+  function cancelBackground() {
+    bgCancelled.current = true;
+    setBgLabel(null);
+    toast("Background removal cancelled");
+  }
+
   function toggleReverse() {
     if (!isVideo) return;
     const patch = reversed ? clearSpeedRemap(clip) : applySpeedPreset(clip, "reverse");
@@ -223,6 +344,16 @@ function InspectorFields({
   }
 
   const isText = clip.type === "text";
+  const noBackground = clip.name.startsWith(NO_BG_PREFIX);
+
+  // Only video has enough controls to be worth splitting. Everything else
+  // keeps its single column, so no control becomes harder to find than it was.
+  const tabbed = isVideo;
+  const onBasic = !tabbed || tab === "Basic";
+  const onSpeed = !tabbed || tab === "Speed";
+  const onTransform = !tabbed || tab === "Transform";
+  /** What the clip actually occupies now, which is what a speed change moves. */
+  const durationSec = framesToSeconds(clip.durationFrames, fps);
 
   /**
    * Commits the field. Emptying a text clip deletes it: a text clip with no
@@ -246,7 +377,7 @@ function InspectorFields({
 
   return (
     <div className="mt-3 flex flex-col gap-3">
-      <label className="text-[11px] text-[#c8c8ce]">
+      <label className="text-[12px] font-semibold text-[#c8c8ce]">
         {isText ? "Text" : "Name"}
         <input
           value={name}
@@ -265,8 +396,16 @@ function InspectorFields({
           </span>
         )}
       </label>
+
+      {tabbed && (
+        <div className="-mx-3">
+          <SubTabs tabs={CLIP_TABS} value={tab} onChange={setTab} />
+        </div>
+      )}
+
+      {onTransform && (
       <div className="grid grid-cols-2 gap-2">
-        <label className="text-[11px] text-[#c8c8ce]">
+        <label className="text-[12px] font-semibold text-[#c8c8ce]">
           X
           <input
             type="number"
@@ -279,7 +418,7 @@ function InspectorFields({
             className={`${fieldClass} mt-1`}
           />
         </label>
-        <label className="text-[11px] text-[#c8c8ce]">
+        <label className="text-[12px] font-semibold text-[#c8c8ce]">
           Y
           <input
             type="number"
@@ -293,37 +432,47 @@ function InspectorFields({
           />
         </label>
       </div>
+      )}
 
-      <SliderRow
-        label="Scale"
-        min={0}
-        max={200}
-        step={1}
-        value={scale}
-        display={`${scale}%`}
-        onChange={(value) => preview({ scale: value / 100 })}
-        onCommit={() => commit("Scale")}
-      />
-      <SliderRow
-        label="Rotation"
-        min={-180}
-        max={180}
-        step={1}
-        value={rotation}
-        display={`${rotation}°`}
-        onChange={(value) => preview({ rotation: (value * Math.PI) / 180 })}
-        onCommit={() => commit("Rotation")}
-      />
-      <SliderRow
-        label="Opacity"
-        min={0}
-        max={100}
-        step={1}
-        value={opacity}
-        display={`${opacity}%`}
-        onChange={(value) => preview({ opacity: value / 100 })}
-        onCommit={() => commit("Opacity")}
-      />
+      {onTransform && (
+        <>
+          <SliderRow
+            label="Scale"
+            min={10}
+            max={200}
+            step={1}
+            value={scale}
+            display={`${scale}%`}
+            onChange={(value) => preview({ scale: value / 100 })}
+            onCommit={() => commit("Scale")}
+          />
+          <SliderRow
+            label="Rotation"
+            min={-180}
+            max={180}
+            step={1}
+            value={rotation}
+            display={`${rotation}°`}
+            onChange={(value) => preview({ rotation: (value * Math.PI) / 180 })}
+            onCommit={() => commit("Rotation")}
+          />
+        </>
+      )}
+
+      {onBasic && (
+        <SliderRow
+          label="Opacity"
+          min={0}
+          max={100}
+          step={1}
+          value={opacity}
+          display={`${opacity}%`}
+          onChange={(value) => preview({ opacity: value / 100 })}
+          onCommit={() => commit("Opacity")}
+        />
+      )}
+
+      {onSpeed && (
       <div className={`flex flex-col gap-1.5 ${canSetSpeed ? "" : "opacity-40"}`}>
         <span className="flex items-center justify-between text-[11px] text-[#c8c8ce]">
           Speed
@@ -348,6 +497,17 @@ function InspectorFields({
             );
           })}
         </div>
+        <SliderRow
+          label="Multiplier"
+          min={MIN_SPEED}
+          max={MAX_SPEED}
+          step={0.05}
+          value={speed}
+          display={`${speed.toFixed(2)}x`}
+          disabled={!canSetSpeed}
+          onChange={(value) => onSpeedInput(value.toFixed(2))}
+          onCommit={(value) => commitSpeed(value)}
+        />
         <label className="text-[11px] text-[#c8c8ce]">
           Custom
           <input
@@ -366,7 +526,15 @@ function InspectorFields({
             className={`${fieldClass} mt-1`}
           />
         </label>
+        <p className="text-[11px] text-[#c8c8ce]">
+          New duration: <span className="font-mono text-white">{durationSec.toFixed(1)}s</span>
+        </p>
+        <p className="text-[10px] leading-snug text-[#888899]">
+          The engine clamps speed to {MIN_SPEED}x–{MAX_SPEED}x.
+        </p>
       </div>
+      )}
+      {onSpeed && (
       <button
         type="button"
         disabled={!isVideo}
@@ -381,7 +549,8 @@ function InspectorFields({
         <Rewind className="h-3.5 w-3.5" aria-hidden />
         {reversed ? "Reversed" : "Reverse"}
       </button>
-      {isVideo && !canSetSpeed && (
+      )}
+      {onSpeed && isVideo && !canSetSpeed && (
         <p className="text-[10px] leading-snug text-[#888899]">
           Time keyframes drive this clip, so the speed controls stay off until you clear them.
         </p>
@@ -400,12 +569,49 @@ function InspectorFields({
           <p className="text-[10px] leading-snug text-[#888899]">
             Adds a 2-second still of the frame under the playhead, on the first free video track.
           </p>
+
+          {noBackground && (
+            <span className="flex items-center gap-1 self-start rounded-[4px] bg-[#ffffff] px-1.5 py-0.5 text-[9px] font-semibold text-black">
+              <Eraser className="h-2.5 w-2.5" aria-hidden />
+              Background Removed
+            </span>
+          )}
+
+          {bgLabel === null ? (
+            <button
+              type="button"
+              onClick={() => void removeBackground()}
+              className="flex h-8 items-center justify-center gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] text-[11px] text-white transition-colors duration-150 hover:border-[#ffffff]"
+            >
+              <Eraser className="h-3.5 w-3.5" aria-hidden />
+              {noBackground ? "Remove background again" : "Remove Background"}
+            </button>
+          ) : (
+            <div className="flex flex-col gap-1 rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2 py-1.5">
+              <span className="flex items-center justify-between gap-2">
+                <span className="min-w-0 flex-1 truncate text-[10px] text-white">{bgLabel}</span>
+                <button
+                  type="button"
+                  onClick={cancelBackground}
+                  aria-label="Cancel background removal"
+                  className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#888899] transition-colors hover:text-white"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            </div>
+          )}
+          <p className="text-[10px] leading-snug text-[#888899]">
+            Cuts the subject out frame by frame on the server. Minutes of CPU, capped at the
+            first 30 seconds, and the result is a transparent WebM.
+          </p>
         </>
       )}
       {!isVideo && (
         <p className="text-[10px] text-[#888899]">Speed and reverse apply to video clips.</p>
       )}
 
+      {onBasic && (
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
@@ -424,6 +630,7 @@ function InspectorFields({
           Flip V
         </button>
       </div>
+      )}
 
       {clip.type === "text" && (
         <>
@@ -511,7 +718,7 @@ function InspectorFields({
       )}
       {look.activeEffect && <p className="text-[11px] text-[#c8c8ce]">Effect · {look.activeEffect}</p>}
 
-      {hasVolume && (
+      {hasVolume && onBasic && (
         <>
           <SliderRow
             label="Volume"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { useTimelineEngine } from "@elah/editor";
 import { selectClip } from "../../clipEdit";
 import { useSelectedClip } from "../../useSelectedClip";
@@ -13,7 +14,7 @@ interface TransitionsPanelProps {
   fps: number;
 }
 
-const MIN_SECONDS = 0.25;
+const MIN_SECONDS = 0.2;
 const MAX_SECONDS = 2;
 const DEFAULT_SECONDS = 0.5;
 /** The engine rounds every transition to an even span, so two frames is the floor. */
@@ -152,6 +153,29 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
 
   return (
     <PanelBody>
+      <label className="mb-2 flex flex-col gap-1 text-[11px] text-[#c8c8ce]">
+        <span className="flex items-center justify-between">
+          Duration
+          <span className="font-mono text-[#888899]">{seconds.toFixed(2)}s</span>
+        </span>
+        <input
+          type="range"
+          min={MIN_SECONDS}
+          max={MAX_SECONDS}
+          step={0.05}
+          value={seconds}
+          aria-label="Transition duration in seconds"
+          onChange={(event) => setSeconds(Number(event.target.value))}
+          onPointerUp={commitDuration}
+          onKeyUp={commitDuration}
+          className="w-full accent-[#ffffff]"
+        />
+      </label>
+
+      <div className="mb-2">
+        <SearchField value={query} onChange={setQuery} placeholder="Search transitions" />
+      </div>
+
       {target ? (
         <p className="mb-2 truncate rounded-md bg-[#1e1e24] px-2 py-1.5 text-[11px]">
           <span className="text-white">{gapLabel(target)}</span>
@@ -217,33 +241,10 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
         </div>
       )}
 
-      <label className="mb-2 flex flex-col gap-1 text-[11px] text-[#c8c8ce]">
-        <span className="flex items-center justify-between">
-          Duration
-          <span className="font-mono text-[#888899]">{seconds.toFixed(2)}s</span>
-        </span>
-        <input
-          type="range"
-          min={MIN_SECONDS}
-          max={MAX_SECONDS}
-          step={0.05}
-          value={seconds}
-          aria-label="Transition duration in seconds"
-          onChange={(event) => setSeconds(Number(event.target.value))}
-          onPointerUp={commitDuration}
-          onKeyUp={commitDuration}
-          className="w-full accent-[#ffffff]"
-        />
-      </label>
-
       <div className="mb-2">
         <QuietButton onClick={removeFromTarget} disabled={!live} tone="danger">
           Remove transition
         </QuietButton>
-      </div>
-
-      <div className="mb-2">
-        <SearchField value={query} onChange={setQuery} placeholder="Search transitions" />
       </div>
 
       {cards.length === 0 ? (
@@ -251,15 +252,13 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
       ) : (
         <div className="grid grid-cols-2 gap-1.5">
           {cards.map((card) => (
-            <button
+            <div
               key={card.name}
-              type="button"
               draggable
               onDragStart={(event) => {
                 event.dataTransfer.setData("text/plain", card.name);
                 event.dataTransfer.effectAllowed = "copy";
               }}
-              onClick={() => apply(card)}
               className={`group capfree-tr-stage relative overflow-hidden rounded-md bg-black text-left ${card.cls} ${
                 picked === card.name ? "ring-2 ring-[#ffffff]" : "hover:ring-1 hover:ring-[#ffffff]"
               }`}
@@ -281,13 +280,29 @@ export function TransitionsPanel({ fps }: TransitionsPanelProps) {
                   <img src={TRANSITION_FROM} alt="" className="capfree-piece capfree-piece-4" />
                 </>
               )}
-              <span className="absolute right-1 top-1 rounded bg-black/70 px-1 text-[9px] text-white">
+              <span className="absolute left-1 top-1 rounded bg-black/70 px-1 text-[9px] text-white">
                 {card.instant ? "cut" : `${seconds.toFixed(2)}s`}
               </span>
               <span className="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-1 text-[10px] text-white">
                 {card.name}
               </span>
-            </button>
+
+              {/* Covers the card so a click anywhere applies, as before. */}
+              <button
+                type="button"
+                onClick={() => apply(card)}
+                aria-label={`Apply ${card.name}`}
+                className="absolute inset-0 h-full w-full cursor-pointer"
+              />
+              {/* Shown on hover or when the covering button has focus. The
+                  badge takes no pointer events, so the click lands on it. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-[#ffffff] text-black opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+              >
+                <Plus className="h-3 w-3" />
+              </span>
+            </div>
           ))}
         </div>
       )}

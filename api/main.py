@@ -30,6 +30,7 @@ from tts import router as tts_router
 from translate import router as translate_router
 from upscale import router as upscale_router
 from vocals import router as vocals_router
+from video_bg import router as video_bg_router
 
 MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")  # tiny | base | small | medium | large-v3
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "200"))
@@ -55,6 +56,7 @@ app.include_router(beats_router)
 app.include_router(tts_router)
 app.include_router(tracking_router)
 app.include_router(vocals_router)
+app.include_router(video_bg_router)
 app.include_router(upscale_router)
 app.include_router(translate_router)
 

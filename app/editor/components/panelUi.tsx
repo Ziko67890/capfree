@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 
+/** Shared input shape: full width, 36px tall. */
 export const fieldClass =
-  "h-8 w-full rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2 text-[12px] text-white outline-none focus:border-[#ffffff]";
+  "h-9 w-full rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2.5 text-[12px] text-white outline-none focus:border-[#ffffff]";
 
 export function PanelFrame({
   title,

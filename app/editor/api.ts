@@ -36,6 +36,30 @@ export interface AiPromptResponse {
   remaining?: number;
 }
 
+export interface RemoveBgJob {
+  jobId: string;
+  status: string;
+  framesTotal: number;
+  /** Playback rate of the output, which is sampled down from the source. */
+  outputFps: number;
+  /** How much of the source was taken, after the server's 30s / frame caps. */
+  secondsProcessed: number;
+  etaSeconds: number;
+  note: string;
+}
+
+export interface RemoveBgStatus {
+  jobId: string;
+  status: "queued" | "running" | "encoding" | "done" | "error" | string;
+  progress: number;
+  framesDone: number;
+  framesTotal: number;
+  etaSeconds: number | null;
+  error: string | null;
+  outputPath: string | null;
+  resultUrl: string | null;
+}
+
 export interface SilenceRange {
   start: number;
   end: number;
@@ -526,4 +550,80 @@ export async function requestAiPrompt(
   }
   if (!response.ok) throw new ApiError(await readError(response));
   return response.json() as Promise<AiPromptResponse>;
+}
+
+/**
+ * Queues background removal and returns at once with a job id. The work is
+ * minutes of CPU per clip, so it is polled rather than awaited.
+ */
+export async function requestRemoveVideoBg(file: File, model = "u2net"): Promise<RemoveBgJob> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("model", model);
+  const response = await postForm("/video/remove-bg", body);
+  const data = (await response.json()) as {
+    job_id?: string;
+    status?: string;
+    frames_total?: number;
+    output_fps?: number;
+    seconds_processed?: number;
+    eta_seconds?: number;
+    note?: string;
+  };
+  if (!data.job_id) throw new ApiError("The API did not return a job id");
+  return {
+    jobId: data.job_id,
+    status: data.status ?? "queued",
+    framesTotal: data.frames_total ?? 0,
+    outputFps: data.output_fps ?? 0,
+    secondsProcessed: data.seconds_processed ?? 0,
+    etaSeconds: data.eta_seconds ?? 0,
+    note: data.note ?? "",
+  };
+}
+
+export async function requestRemoveVideoBgStatus(jobId: string): Promise<RemoveBgStatus> {
+  const data = (await getJson(`/video/remove-bg/${encodeURIComponent(jobId)}/status`, {})) as {
+    job_id?: string;
+    status?: string;
+    progress?: number;
+    frames_done?: number;
+    frames_total?: number;
+    eta_seconds?: number | null;
+    error?: string | null;
+    output_path?: string | null;
+    result_url?: string | null;
+  };
+  return {
+    jobId: data.job_id ?? jobId,
+    status: data.status ?? "queued",
+    progress: data.progress ?? 0,
+    framesDone: data.frames_done ?? 0,
+    framesTotal: data.frames_total ?? 0,
+    etaSeconds: data.eta_seconds ?? null,
+    error: data.error ?? null,
+    outputPath: data.output_path ?? null,
+    resultUrl: data.result_url ?? null,
+  };
+}
+
+/** The finished transparent WebM. */
+export async function requestRemoveVideoBgResult(jobId: string): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/video/remove-bg/${encodeURIComponent(jobId)}/result`);
+  } catch {
+    throw new ApiError(UNREACHABLE);
+  }
+  if (!response.ok) throw new ApiError(await readError(response));
+  return response.blob();
+}
+
+/** Abandons a job so the server stops cutting frames and drops the output. */
+export async function cancelRemoveVideoBg(jobId: string): Promise<void> {
+  try {
+    await fetch(`${API_URL}/video/remove-bg/${encodeURIComponent(jobId)}`, { method: "DELETE" });
+  } catch {
+    /* Best effort: the job is daemon-threaded and ages out on its own. */
+  }
 }

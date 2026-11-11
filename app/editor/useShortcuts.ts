@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { playbackStore, splitClipAtPlayhead, tracksStore, useTimelineEngine } from "@elah/editor";
+import {
+  playbackStore,
+  selectionStore,
+  splitClipAtPlayhead,
+  tracksStore,
+  useTimelineEngine,
+} from "@elah/editor";
 import { playheadFrame, seekFrame } from "./captionActions";
 import {
   copySelection,
@@ -119,6 +125,11 @@ export function useShortcuts(fps: number, enabled = true): void {
         case "backspace":
           event.preventDefault();
           report(deleteSelection(engine));
+          return;
+        case "escape":
+          // Dropping the selection is also what collapses the inspector.
+          event.preventDefault();
+          selectionStore.getState().clearSelection();
           return;
         default:
       }

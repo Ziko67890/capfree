@@ -355,3 +355,49 @@ html[data-theme="dark"] .capfree-landing {
 .capfree-piece-2 { top: 0; right: 0; object-position: right top; }
 .capfree-piece-3 { bottom: 0; left: 0; object-position: left bottom; }
 .capfree-piece-4 { bottom: 0; right: 0; object-position: right bottom; }
+
+/* ---------------------------------------------------------------------------
+   Media library shape.
+
+   SourcePanel draws its own ingest surface, so these ride the classNames hooks
+   MediaPanel passes it. Kept to the three things that were asked for: the drop
+   target, a two-up file grid, and the filename under the thumbnail.
+   --------------------------------------------------------------------------- */
+
+/* The drop target. Its copy and arrow are hardcoded in the component; only the
+   shape is reachable from here. Keyed on the dashed-border utility the
+   component emits, which is the only handle that element leaves. */
+.capfree-media-drop .border-dashed {
+  min-height: 140px;
+  border-width: 1px;
+  border-radius: 8px;
+}
+
+/* Files two-up. :has() picks only the container that actually holds cards, so
+   the empty state and the "No matches" line are left alone. */
+.capfree-media-drop > div:has(> .elah-media-card) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* The card is `flex items-center` in both of SourcePanel's view modes -- its
+   "grid" mode only means "with a thumbnail", not stacked -- so the axis is
+   turned here to put the filename under the thumbnail. */
+.capfree-media-drop .elah-media-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* !important because the component sets the thumb's width and height inline,
+   and an inline style outranks a class. */
+.capfree-media-thumb {
+  width: 100% !important;
+  height: 64px !important;
+}
+
+.capfree-media-title {
+  font-size: 11px;
+  line-height: 1.35;
+}
