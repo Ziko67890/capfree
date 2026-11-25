@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useTimelineEngine } from "@elah/editor";
 import type { FillerHit } from "../../api";
-import { requestFillerDetect, requestFillerRemove } from "../../api";
+import { requestFillerDetect } from "../../api";
 import { SPOKEN_LANGUAGES } from "../../library";
-import { fileFromClip, replaceClipFile, targetVideoClip } from "../../timelineMedia";
+import { fileFromClip, targetVideoClip } from "../../timelineMedia";
+import { cutSourceRanges, withCompanions } from "../../timelineCuts";
 import { seekFrame } from "../../captionActions";
 import { stamp, useApiJob } from "../../useApiJob";
 import { ErrorNote, HintNote, PanelBody, PrimaryButton, QuietButton, SearchField } from "../chrome";
@@ -72,12 +73,22 @@ export function FillerFixPanel({ fps }: { fps: number }) {
 
       const located = targetVideoClip(engine);
       if (!located) throw new Error("Add a video to the timeline first.");
-      const blob = await requestFillerRemove(await fileFromClip(located.clip), segments);
-      const file = new File([blob], "cleaned.mp4", { type: "video/mp4" });
-      await replaceClipFile(engine, located, file, "video", fps);
+      // Cut on the timeline rather than asking /fillers/remove to re-encode:
+      // the words come out of the edit immediately, the clip keeps its trim
+      // handles and its media, and one Ctrl+Z puts them all back.
+      const result = cutSourceRanges(
+        engine,
+        withCompanions(engine, located),
+        segments,
+        fps,
+        "Remove filler words",
+      );
+      if (result.cuts === 0) throw new Error("Those words fall outside the clip's trim.");
       setDetection(null);
       setPicked(new Set());
-      toast(`${segments.length} segment${segments.length === 1 ? "" : "s"} cut`);
+      toast(
+        `${result.cuts} segment${result.cuts === 1 ? "" : "s"} cut — ${result.secondsRemoved.toFixed(1)}s removed`,
+      );
     });
   }
 

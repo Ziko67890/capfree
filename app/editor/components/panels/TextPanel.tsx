@@ -266,11 +266,11 @@ export function TextPanel({ fps }: TextPanelProps) {
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] text-[#c8c8ce]">Colour</span>
                 <div className="grid grid-cols-8 gap-1">
-                  {TEXT_COLORS.map((colour) => {
+                  {TEXT_COLORS.map((colour, index) => {
                     const on = (textClip.clip.color ?? "#ffffff").toLowerCase() === colour;
                     return (
                       <button
-                        key={colour}
+                        key={`${colour}-${index}`}
                         type="button"
                         aria-label={`Colour ${colour}`}
                         aria-pressed={on}

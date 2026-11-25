@@ -10,7 +10,16 @@ import {
   Snowflake,
   X,
 } from "lucide-react";
-import { applySpeedPreset, clearSpeedRemap, hasTimeRemap, matchSpeedPreset } from "@elah/core";
+import {
+  applySpeedPreset,
+  clampEffectParams,
+  clearSpeedRemap,
+  createEffect,
+  getEffectDefinition,
+  hasTimeRemap,
+  matchSpeedPreset,
+  type Effect,
+} from "@elah/core";
 import {
   framesToSeconds,
   framesToTimecode,
@@ -28,7 +37,7 @@ import { playheadFrame } from "../captionActions";
 import { deleteSelection, withTransform } from "../clipEdit";
 import { freezeFrameAt } from "../freezeFrame";
 import { fileFromClip, replaceClipFile } from "../timelineMedia";
-import { FONT_LIST, FILTER_LOOKS, mixFilter } from "../visuals";
+import { FONT_LIST, FILTER_LOOKS, gradeParamsFromFilter, mixFilter } from "../visuals";
 import { SubTabs } from "./chrome";
 import { fieldClass } from "./panelUi";
 import { useToast } from "./toast";
@@ -201,6 +210,8 @@ function InspectorFields({
   const reversed = isVideo && timeKeys.length > 0 && matchSpeedPreset(clip, timeKeys) === "reverse";
   // setClipSpeed refuses a clip whose timing is already driven by keyframes.
   const canSetSpeed = isVideo && !hasTimeRemap(clip);
+  // colorGrade is a visual effect; an audio clip has nothing to grade.
+  const canGrade = (getEffectDefinition("colorGrade")?.appliesTo ?? []).includes(clip.type);
 
   function preview(patch: Partial<Transform> & { opacity?: number; volume?: number }) {
     const { opacity: nextOpacity, volume: nextVolume, ...transformPatch } = patch;
@@ -215,6 +226,43 @@ function InspectorFields({
 
   function commit(label: string) {
     engine.commitInteraction(label);
+  }
+
+  /**
+   * The look picked in Filters is a CSS filter laid over the whole stage: no
+   * history entry can hold it and no export ever sees it, which is why the
+   * commit here had nothing to commit. Dragging the slider now moves that look
+   * onto this clip as a real `colorGrade` effect -- previewed through the
+   * engine on every move, committed once on release -- so the intensity is an
+   * undoable edit that survives export, exactly as Volume is in TimelineBar.
+   *
+   * The stage CSS is dropped as the grade takes over, so the look is never
+   * applied twice. The filter's name stays set, so the Filters panel keeps
+   * showing which look is active and this slider stays on screen.
+   */
+  function gradeFilter(level: number) {
+    const card = FILTER_LOOKS.find((item) => item.name === look.activeFilter);
+    if (!card || !canGrade) return;
+    const mixed = mixFilter(card.css, level);
+    const effects = clip.effects ?? [];
+    // Amends the clip's own grade the way the Effects panel's adjustment
+    // sliders do, so one effect is edited across the whole drag and the
+    // channels a look does not touch -- exposure, gamma, tint, lift -- are left
+    // as the user set them.
+    const previous = effects.find((effect) => effect.kind === "colorGrade");
+    const base = previous ?? createEffect("colorGrade");
+    const next: Effect = {
+      ...base,
+      params:
+        clampEffectParams("colorGrade", {
+          ...base.params,
+          ...gradeParamsFromFilter(mixed === "none" ? "" : mixed),
+        }) ?? base.params,
+    };
+    engine.previewClip(clip.id, trackId, {
+      effects: [...effects.filter((effect) => effect.kind !== "colorGrade"), next],
+    });
+    if (look.filterCss) look.setFilter(card.name, "");
   }
 
   /** Clamped to the engine's own range, so the field cannot promise more. */
@@ -706,14 +754,12 @@ function InspectorFields({
           step={1}
           value={filterLevel}
           display={`${filterLevel}`}
+          disabled={!canGrade}
           onChange={(value) => {
             setFilterLevel(value);
-            const card = FILTER_LOOKS.find((item) => item.name === look.activeFilter);
-            if (!card) return;
-            const mixed = mixFilter(card.css, value);
-            look.setFilter(card.name, mixed === "none" ? "" : mixed);
+            gradeFilter(value);
           }}
-          onCommit={() => undefined}
+          onCommit={() => commit("Filter intensity")}
         />
       )}
       {look.activeEffect && <p className="text-[11px] text-[#c8c8ce]">Effect · {look.activeEffect}</p>}

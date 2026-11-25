@@ -139,6 +139,22 @@ const MIME = new Map([
   [".wav", "audio/wav"],
 ]);
 
+/**
+ * Next asks for a route's flight payload as `__next.<segment>.__PAGE__.txt`,
+ * but the export writes it as a directory: `__next.<segment>/__PAGE__.txt`.
+ * Without this the request 404s, the router gives up on the client-side
+ * navigation and reloads the whole document instead.
+ */
+const FLIGHT_PAYLOAD = /^(__next\..+)\.(__PAGE__\.txt)$/;
+
+function flightCandidate(relative) {
+  const dir = path.posix.dirname(relative);
+  const match = FLIGHT_PAYLOAD.exec(path.posix.basename(relative));
+  if (!match) return null;
+  const nested = `${match[1]}/${match[2]}`;
+  return dir === "." ? nested : `${dir}/${nested}`;
+}
+
 /** Maps a request path onto a file in the export, the way a static host would. */
 async function resolveExportPath(pathname) {
   let clean;
@@ -150,10 +166,11 @@ async function resolveExportPath(pathname) {
   clean = clean.replace(/\/+$/, "");
   const relative = clean.replace(/^\/+/, "");
   const candidates = relative
-    ? [relative, `${relative}.html`, path.join(relative, "index.html")]
+    ? [relative, flightCandidate(relative), `${relative}.html`, path.join(relative, "index.html")]
     : ["index.html"];
 
   for (const candidate of candidates) {
+    if (!candidate) continue;
     const full = path.join(EXPORT_DIR, candidate);
     // Keep a crafted path from walking out of the export directory.
     if (full !== EXPORT_DIR && !full.startsWith(EXPORT_DIR + path.sep)) continue;
@@ -241,6 +258,11 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      // Chromium throttles rAF — and with it the preview's render loop and the
+      // playhead — in a window it considers hidden or occluded. For an editor
+      // that is wrong: playback has to keep its timing whether or not the
+      // window is in front. The cost is that a minimised window still draws.
+      backgroundThrottling: false,
     },
   });
 

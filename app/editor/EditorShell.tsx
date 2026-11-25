@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   createDefaultDemuxerFactory,
   EditorProvider,
@@ -8,10 +16,9 @@ import {
   Timeline,
   framesToSeconds,
   insertMediaAsset,
-  usePlayback,
-  useTimeline,
+  usePlaybackStore,
   useTimelineEngine,
-  useTracks,
+  useTracksStore,
   type AssetActivationPayload,
   type Clip,
   type PreviewHandle,
@@ -28,8 +35,10 @@ import {
 } from "./autosave";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { consumeSticker } from "./stickerDrag";
+import { playheadFrame, seekFrame } from "./captionActions";
 import { useSelectedClip } from "./useSelectedClip";
 import { useAutoSave } from "./useAutoSave";
+import { usePlayheadFollow } from "./usePlayheadFollow";
 import { useShortcuts } from "./useShortcuts";
 import { RestoreBanner } from "./components/RestoreBanner";
 import { ExportModal } from "./components/ExportModal";
@@ -47,43 +56,97 @@ const FPS = 30;
 
 /** TimelineBar's own h-9, so collapsing leaves exactly that row showing. */
 const TIMELINE_BAR_HEIGHT = 36;
-/** Bar + ruler (32) + two 56px tracks, plus 40px of slack for a third. */
-const TIMELINE_HEIGHT = 220;
+/** Bar + ruler (32) + two 56px tracks — kept compact so preview gets more height. */
+const TIMELINE_HEIGHT = 160;
+/**
+ * The SDK's own default, stated here because usePlayheadFollow has to place the
+ * needle by the same arithmetic the Timeline does. Passed to both so the two
+ * cannot drift apart.
+ */
+const TIMELINE_SIDEBAR_WIDTH = 184;
+
+/** How far a press may wander and still count as a click rather than a drag. */
+const CLICK_SLOP_PX = 4;
+
+/**
+ * Whether a click on the stage reached the picture itself.
+ *
+ * While the transport is paused the SDK stacks editing overlays over the
+ * canvas — click to select, drag to move, handles to resize and crop,
+ * double-click to edit text — and draws a full-size box over every visible
+ * clip, so on a full-frame clip there is no bare canvas left to hit. A click
+ * that reaches the canvas, or the stage around it, is therefore the
+ * unambiguous one: nothing else can have meant it.
+ */
+function reachedPicture(event: ReactMouseEvent<HTMLDivElement>): boolean {
+  return event.target === event.currentTarget || event.target instanceof HTMLCanvasElement;
+}
 
 function EditorInner() {
   const previewRef = useRef<PreviewHandle>(null);
+  const stageWrapRef = useRef<HTMLDivElement>(null);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [tab, setTab] = useState<EditorTab>("media");
   const engine = useTimelineEngine();
   const toast = useToast();
-  // Read once on mount: a snapshot found here is offered, not applied.
   const [pending, setPending] = useState<AutoSave | null>(() => readAutoSave());
 
-  // Held off until the offer is resolved, so the minute tick cannot overwrite
-  // the snapshot the banner is about to restore.
   useAutoSave(pending === null);
+  usePlayheadFollow(TIMELINE_SIDEBAR_WIDTH);
   useShortcuts(FPS);
-  const playback = usePlayback();
-  const tracks = useTracks();
-  const timeline = useTimeline();
+
+  // Compute the largest 16:9 box that fits the stage wrapper.
+  useEffect(() => {
+    const el = stageWrapRef.current;
+    if (!el) return;
+    const compute = () => {
+      const { width: W, height: H } = el.getBoundingClientRect();
+      const byWidth = { w: W, h: W * (9 / 16) };
+      const byHeight = { w: H * (16 / 9), h: H };
+      setStageSize(byHeight.w <= W ? byHeight : byWidth);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Force Preview's ResizeObserver to fire after layout is fully painted.
+  // The GpuRenderer reads container.clientWidth/clientHeight on first resize;
+  // if that fires before flex has settled the container is 0px and the canvas
+  // stays tiny. Dispatching a synthetic resize 100ms after mount re-triggers
+  // the ResizeObserver with the real dimensions.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const isPlaying = usePlaybackStore((state) => state.isPlaying);
+  const loop = usePlaybackStore((state) => state.loop);
+  const play = usePlaybackStore((state) => state.play);
+  const pause = usePlaybackStore((state) => state.pause);
+  const setCurrentFrame = usePlaybackStore((state) => state.setCurrentFrame);
+  const toggleLoop = usePlaybackStore((state) => state.toggleLoop);
+  const totalFrames = useTracksStore((state) => state.totalFrames);
   const look = usePreviewLook();
-  // The inspector is shown only while a clip is selected; deselecting gives the
-  // preview the space back.
-  const hasSelection = useSelectedClip() !== null;
+  const selected = useSelectedClip();
+  const hasSelection = selected !== null;
   const previewFilter = [look.filterCss, look.effectCss, look.adjustCss].filter(Boolean).join(" ");
 
-  const totalFrames = tracks.totalFrames;
   const totalSeconds = framesToSeconds(totalFrames, FPS);
 
   const handleAssetActivate = useCallback(
     async (payload: AssetActivationPayload) => {
       if (payload.kind === "media-asset") {
-        await insertMediaAsset(timeline, payload.asset.id);
+        await insertMediaAsset(engine, payload.asset.id);
       }
     },
-    [timeline],
+    [engine],
   );
 
   useEffect(() => {
@@ -101,6 +164,62 @@ function EditorInner() {
     return () => engine.off("clip:added", onAdded);
   }, [engine]);
 
+  /*
+    Where the press started, and what was selected when it did.
+
+    Recorded in the capture phase for two reasons: the SDK's clip boxes call
+    stopPropagation on pointerdown, which would hide a bubbling handler, and
+    they select the clip under the pointer there too. Selecting on pointerdown
+    means that by the time the click arrives the selection already includes
+    whatever was just clicked, so the click handler cannot tell "this clip was
+    already selected" from "this click is what selected it" — only a snapshot
+    taken before the SDK runs can.
+  */
+  const press = useRef<{ x: number; y: number; selectedId: string | null } | null>(null);
+
+  function recordStagePress(event: ReactPointerEvent<HTMLDivElement>) {
+    press.current =
+      event.button === 0
+        ? { x: event.clientX, y: event.clientY, selectedId: selected?.clip.id ?? null }
+        : null;
+  }
+
+  /**
+   * Clicking the picture works the transport, the way a player does — but the
+   * picture is also the editing surface, so only a click with nothing else to
+   * mean counts.
+   *
+   * Playing, the overlays are inert and a click can only mean "stop". Paused,
+   * a click that lands on an overlay is doing that overlay's job: picking a
+   * clip that was not selected, or reaching a text clip, whose second click
+   * opens its editor. Those are left alone; a click on an already-selected
+   * clip has no other job, so it runs the transport.
+   */
+  function toggleFromStage(event: ReactMouseEvent<HTMLDivElement>) {
+    const start = press.current;
+    press.current = null;
+    if (!start || event.detail > 1) return;
+    const drag =
+      Math.abs(event.clientX - start.x) > CLICK_SLOP_PX ||
+      Math.abs(event.clientY - start.y) > CLICK_SLOP_PX;
+    if (drag) return;
+    if (!isPlaying && !reachedPicture(event)) {
+      // Nothing was selected when the press landed, so this click is what
+      // picked the clip — that was its job.
+      if (start.selectedId === null) return;
+      // Text keeps its second click: double-clicking the box opens the editor.
+      if (selected?.clip.type === "text") return;
+    }
+    if (isPlaying) pause();
+    // The engine owns the clock while it runs, so the frame it stopped on is
+    // the authoritative one. Re-asserting it bumps the store's frame epoch,
+    // which is EditorProvider's cue to reconcile store and engine, leaving the
+    // timeline needle on exactly the frame the preview is showing before
+    // playback starts or resumes.
+    seekFrame(playheadFrame());
+    if (!isPlaying) play();
+  }
+
   function restoreSession() {
     if (!pending) return;
     const failure = applyAutoSave(engine, pending);
@@ -113,7 +232,9 @@ function EditorInner() {
     toast(
       lost === 0
         ? "Session restored"
-        : `Session restored — ${lost} clip${lost === 1 ? "" : "s"} needs its media re-imported`,
+        : lost === 1
+          ? "Session restored — 1 clip needs its media re-imported"
+          : `Session restored — ${lost} clips need their media re-imported`,
       lost === 0 ? "ok" : "error",
     );
   }
@@ -131,107 +252,99 @@ function EditorInner() {
       )}
       <ToolBar tab={tab} onTab={setTab} />
 
+      {/* Main editor body — three columns: left panel | preview | inspector */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <LeftPanel tab={tab} fps={FPS} onAssetActivate={handleAssetActivate} />
 
-        <section className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-[#1a1a1e] px-4 py-4">
-          {/*
-            The area the controls leave over. It is far wider than 16:9 -- on a
-            1080p window roughly 1368x616, an aspect of 2.2 -- so the stage box
-            has to be the largest 16:9 that fits inside it rather than the whole
-            thing. Preview's own ResizeObserver hands the renderer whatever this
-            box measures, and the renderer letterboxes the project's 16:9 stage
-            within that; so a full-width box meant the renderer drew the bars
-            itself, up to 276px a side, which read as a small picture in a big
-            black frame.
+        {/* LEFT PANEL — fixed width, full content visible */}
+        <div
+          className="shrink-0 border-r border-[#34343a] bg-[#1a1a1e] overflow-y-auto overflow-x-hidden"
+          style={{ width: 270, minWidth: 270 }}
+        >
+          <LeftPanel tab={tab} fps={FPS} onAssetActivate={handleAssetActivate} />
+        </div>
 
-            inset-0 with auto width/height, an aspect ratio and both max
-            constraints resolves to exactly that largest fitting box, and
-            margin:auto centres it. Now the box and the stage are the same
-            shape, so there are no bars and the frame hugs the picture.
-          */}
-          <div className="relative min-h-0 w-full flex-1">
+        {/* CENTER — preview fills remaining space */}
+        <section
+          className="flex min-w-0 flex-1 flex-col bg-[#111113]"
+        >
+          {/* Preview area — takes all remaining vertical space */}
+          <div className="relative min-h-0 flex-1" ref={stageWrapRef}>
+            {/* 16:9 stage centred inside the available box */}
             <div
-              className="capfree-stage absolute inset-0 m-auto aspect-[16/9] max-h-full max-w-full overflow-hidden rounded-lg bg-black shadow-2xl"
-              style={{ filter: previewFilter || undefined }}
+              className="capfree-stage overflow-hidden rounded-xl bg-black shadow-2xl"
+              onPointerDownCapture={recordStagePress}
+              onClick={toggleFromStage}
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: stageSize.w,
+                height: stageSize.h,
+                filter: previewFilter || undefined,
+              }}
             >
-            <Preview
-              ref={previewRef}
-              className="h-full w-full"
-              enableAudio
-              demuxerFactory={demuxerFactory}
-            />
-            {look.vignette > 0 && (
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{ boxShadow: `inset 0 0 ${40 + look.vignette * 1.4}px rgba(0,0,0,${0.25 + look.vignette / 180})` }}
+              <Preview
+                ref={previewRef}
+                className="h-full w-full"
+                style={{ display: "block", width: "100%", height: "100%" }}
+                enableAudio
+                demuxerFactory={demuxerFactory}
               />
-            )}
-            {look.grain > 0 && (
-              /* The class carries the noise; the slider scales how much shows. */
-              <div
-                className="capfree-grain pointer-events-none absolute inset-0"
-                style={{ opacity: (look.grain / 100) * 0.5 }}
-              />
-            )}
-            {look.reframe && (
-              <div
-                className="pointer-events-none absolute border-2 border-[#ffffff]"
-                style={{
-                  left: `${look.reframe.x * 100}%`,
-                  top: `${look.reframe.y * 100}%`,
-                  width: `${look.reframe.width * 100}%`,
-                  height: `${look.reframe.height * 100}%`,
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
-                }}
-              />
-            )}
+              {look.vignette > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{ boxShadow: `inset 0 0 ${40 + look.vignette * 1.4}px rgba(0,0,0,${0.25 + look.vignette / 180})` }}
+                />
+              )}
+              {look.grain > 0 && (
+                <div
+                  className="capfree-grain pointer-events-none absolute inset-0"
+                  style={{ opacity: (look.grain / 100) * 0.5 }}
+                />
+              )}
+              {look.reframe && (
+                <div
+                  className="pointer-events-none absolute border-2 border-[#ffffff]"
+                  style={{
+                    left: `${look.reframe.x * 100}%`,
+                    top: `${look.reframe.y * 100}%`,
+                    width: `${look.reframe.width * 100}%`,
+                    height: `${look.reframe.height * 100}%`,
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+                  }}
+                />
+              )}
             </div>
           </div>
-          <PlaybackControls
-            isPlaying={playback.isPlaying}
-            currentFrame={playback.currentFrame}
-            totalFrames={totalFrames}
-            fps={FPS}
-            loop={playback.loop}
-            onPlay={playback.play}
-            onPause={playback.pause}
-            onSeek={playback.setCurrentFrame}
-            onToggleLoop={playback.toggleLoop}
-            totalSeconds={totalSeconds}
-          />
+
+          {/* Playback controls — centered below preview */}
+          <div className="shrink-0 py-2">
+            <PlaybackControls
+              isPlaying={isPlaying}
+              totalFrames={totalFrames}
+              fps={FPS}
+              loop={loop}
+              onPlay={play}
+              onPause={pause}
+              onSeek={setCurrentFrame}
+              onToggleLoop={toggleLoop}
+              totalSeconds={totalSeconds}
+            />
+          </div>
         </section>
 
-        {/*
-          Width animates rather than the panel unmounting: an element that is
-          gone cannot transition. The inner aside keeps its fixed 280px, so the
-          panel slides out of a clipping box instead of its contents reflowing
-          on every frame.
-
-          Driven straight off the selection store via useSelectedClip, so there
-          is no second copy of "is something selected" to keep in step.
-        */}
+        {/* RIGHT PANEL — Inspector, fixed width, full content visible */}
         <div
-          className="shrink-0 overflow-hidden transition-[width] duration-200 ease-out"
-          style={{ width: hasSelection ? 280 : 0 }}
+          className="shrink-0 border-l border-[#34343a] bg-[#1a1a1e] overflow-y-auto overflow-x-hidden transition-[width] duration-200 ease-out"
+          style={{ width: hasSelection ? 280 : 0, minWidth: hasSelection ? 280 : 0 }}
           aria-hidden={!hasSelection}
-          // A zero-width box still holds focusable inputs, so the collapsed
-          // panel is taken out of the tab order too, not just hidden.
           inert={!hasSelection}
         >
           <InspectorPanel fps={FPS} />
         </div>
       </div>
 
-      {/*
-        220px expanded: the bar (36) plus the ruler (32) plus two 56px tracks
-        needs 180, so this keeps 40px of slack to show a third row starting.
-        Collapsed is exactly the bar's own h-9, so the row is never clipped.
-
-        The preview is limited by height rather than width, so this band is the
-        one dial that makes the picture bigger -- which is the whole point of
-        being able to fold it away.
-      */}
       <div
         className="flex shrink-0 flex-col overflow-hidden border-t border-[#34343a] bg-[#1a1a1e] transition-[height] duration-200 ease-out"
         style={{ height: timelineCollapsed ? TIMELINE_BAR_HEIGHT : TIMELINE_HEIGHT }}
@@ -255,18 +368,17 @@ function EditorInner() {
             <TimelineBar fps={FPS} />
           </div>
         </div>
-        {/* Collapsed this is zero-height; the clips inside stay focusable
-            unless the box is taken out of the tab order too. */}
         <div
           className="min-h-0 flex-1 overflow-hidden"
           data-capfree-timeline
           aria-hidden={timelineCollapsed}
           inert={timelineCollapsed}
         >
-          {/* compactSidebar suppresses both the track name and the
-              eye/lock buttons in TrackRow, so it stays off for the labels to
-              read "Video 1" / "Audio 1" with their controls. */}
-          <Timeline className="h-full" compactSidebar={false} />
+          <Timeline
+            className="h-full"
+            compactSidebar={false}
+            sidebarWidth={TIMELINE_SIDEBAR_WIDTH}
+          />
         </div>
       </div>
 
@@ -280,8 +392,6 @@ function EditorInner() {
 const subscribeNever = () => () => {};
 
 export function EditorShell() {
-  // EditorProvider uses Math.random for track IDs. Defer until after mount so
-  // Next cacheComponents prerender does not blank /editor.
   const ready = useSyncExternalStore(
     subscribeNever,
     () => true,

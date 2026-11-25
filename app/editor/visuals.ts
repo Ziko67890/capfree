@@ -123,6 +123,62 @@ export function mixFilter(css: string, intensity: number): string {
   });
 }
 
+/**
+ * The same look expressed as `colorGrade` params, so a preview filter can be
+ * put on a clip as a real engine effect instead of CSS over the stage.
+ *
+ * It is a close approximation rather than an identity: brightness rides on
+ * `gain`, and `sepia` -- which CSS implements as a fixed tone matrix -- is read
+ * as "pull the saturation down and warm it up", the two things the grade can
+ * actually do. `blur` is skipped; that is its own `gaussianBlur` effect, not
+ * part of a grade.
+ */
+export function gradeParamsFromFilter(css: string): Record<string, number> {
+  let contrast = 1;
+  let saturation = 1;
+  let gain = 1;
+  let temperature = 0;
+  let hue = 0;
+
+  if (css && css !== "none") {
+    // matchAll works off a copy, so the shared global regex keeps its own
+    // lastIndex at zero and mixFilter is unaffected.
+    for (const [, name, raw] of css.matchAll(FILTER_TOKEN)) {
+      const value = Number.parseFloat(raw);
+      if (!Number.isFinite(value)) continue;
+      const unit = Math.min(1, Math.max(0, value));
+      switch (name) {
+        case "brightness":
+          gain *= value;
+          break;
+        case "contrast":
+          contrast *= value;
+          break;
+        case "saturate":
+          saturation *= value;
+          break;
+        case "grayscale":
+          saturation *= 1 - unit;
+          break;
+        case "sepia":
+          saturation *= 1 - unit * 0.5;
+          temperature += unit * 0.6;
+          break;
+        case "hue-rotate":
+          hue += value;
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  // CSS hue-rotate wraps freely; the grade's hue is -180..180, so 215deg has to
+  // come back as -145 rather than being clamped flat to the end of the range.
+  const wrapped = ((((hue + 180) % 360) + 360) % 360) - 180;
+  return { contrast, saturation, gain, temperature, hue: wrapped };
+}
+
 export interface EffectLook {
   name: string;
   cls: string;

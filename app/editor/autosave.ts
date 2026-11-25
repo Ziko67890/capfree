@@ -1,9 +1,8 @@
 "use client";
 
 import {
-  deserializeProject,
   isRecoverableMediaSrc,
-  serializeProject,
+  readProjectDocument,
   type TimelineEngine,
 } from "@elah/editor";
 
@@ -14,8 +13,32 @@ export interface AutoSave {
   savedAt: number;
   /** Clip count at save time, so the banner can describe what is on offer. */
   clips: number;
-  /** The serialized project, handed straight back to the engine. */
-  project: string;
+  /**
+   * The project document itself, nested in the envelope rather than embedded
+   * in it as a string of JSON. `unknown` because it has been through storage
+   * and is only a project once `readProjectDocument` says so.
+   */
+  project: object;
+}
+
+/**
+ * Normalizes either stored shape to the project document.
+ *
+ * Snapshots written before the double encode came out hold a string of JSON,
+ * which is parsed once here. Reading both keeps a session someone has not
+ * reloaded since from being thrown away by the upgrade.
+ */
+function storedProject(stored: unknown): object | null {
+  if (typeof stored === "string") {
+    if (stored.length === 0) return null;
+    try {
+      const parsed: unknown = JSON.parse(stored);
+      return parsed !== null && typeof parsed === "object" ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return stored !== null && typeof stored === "object" ? stored : null;
 }
 
 function clipCount(engine: TimelineEngine): number {
@@ -33,10 +56,17 @@ export function writeAutoSave(engine: TimelineEngine): boolean {
   // An empty timeline is not worth offering back on the next load.
   if (clips === 0) return false;
   try {
+    /*
+      The project goes in as an object. It used to go in as the string
+      serializeProject returns, which the envelope's own JSON.stringify then
+      escaped quote by quote -- roughly doubling what reached localStorage, to
+      encode something that was already encoded, and leaving the reader a
+      second parse to undo it. One pass covers both now.
+    */
     const envelope: AutoSave = {
       savedAt: Date.now(),
       clips,
-      project: serializeProject(engine),
+      project: engine.getProject(),
     };
     window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(envelope));
     return true;
@@ -57,11 +87,12 @@ export function readAutoSave(): AutoSave | null {
 
   try {
     const parsed = JSON.parse(raw) as Partial<AutoSave>;
-    if (typeof parsed.project !== "string" || parsed.project.length === 0) return null;
     if (typeof parsed.savedAt !== "number" || !Number.isFinite(parsed.savedAt)) return null;
     const clips = typeof parsed.clips === "number" ? parsed.clips : 0;
     if (clips <= 0) return null;
-    return { savedAt: parsed.savedAt, clips, project: parsed.project };
+    const project = storedProject(parsed.project);
+    if (project === null) return null;
+    return { savedAt: parsed.savedAt, clips, project };
   } catch {
     return null;
   }
@@ -78,7 +109,10 @@ export function clearAutoSave(): void {
 /** Loads a snapshot into the engine. Returns a message on failure, else null. */
 export function applyAutoSave(engine: TimelineEngine, save: AutoSave): string | null {
   try {
-    deserializeProject(engine, save.project);
+    // What deserializeProject does once it has parsed its argument. The
+    // project arrives as an object here, so that parse — the reading half of
+    // the double encode — has nothing left to do.
+    engine.loadProject(readProjectDocument(save.project));
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : "That saved session could not be read.";

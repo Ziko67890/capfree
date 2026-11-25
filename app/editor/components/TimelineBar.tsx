@@ -7,7 +7,6 @@ import {
   framesToTimecode,
   playbackStore,
   splitClipAtPlayhead,
-  usePlayback,
   usePlaybackStore,
   useTimelineEngine,
   useTracksStore,
@@ -21,21 +20,56 @@ import {
   selectedClips,
   SPLIT_MESSAGE,
 } from "../clipEdit";
+import { playheadFrame } from "../captionActions";
+import { useSelectedClip } from "../useSelectedClip";
 
 interface TimelineBarProps {
   fps: number;
 }
 
+/**
+ * Its own component so the frame subscription stops here. Read into the bar
+ * itself, the advancing playhead re-rendered this whole row -- ten buttons and
+ * their icons -- on every frame of playback.
+ */
+function Timecode({ fps }: { fps: number }) {
+  const currentFrame = usePlaybackStore((state) => state.currentFrame);
+  return <span className="font-mono text-[12px] text-white">{framesToTimecode(currentFrame, fps)}</span>;
+}
+
 export function TimelineBar({ fps }: TimelineBarProps) {
   const engine = useTimelineEngine();
-  const playback = usePlayback();
   const zoom = usePlaybackStore((state) => state.zoom);
   const canUndo = useTracksStore((state) => state.canUndo);
   const canRedo = useTracksStore((state) => state.canRedo);
+  const selected = useSelectedClip();
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState<"speed" | "volume" | null>(null);
   const [speed, setSpeed] = useState(1);
   const [volume, setVolume] = useState(100);
+  const [sliderSource, setSliderSource] = useState("");
+
+  // What the clip actually carries. Speed is stored signed -- a reversed clip
+  // reads negative -- and the slider only covers forward rates, so the
+  // magnitude is what it shows.
+  const clipSpeed = Math.abs(selected?.clip.speed ?? 1);
+  const clipVolume = Math.round((selected?.clip.volume ?? 1) * 100);
+
+  // Re-seed both sliders from the selection, so opening either popover shows
+  // the current clip's real value rather than a hardcoded 1x / 100%. Keyed on
+  // the committed values too, so an undo or an edit made elsewhere pulls the
+  // sliders back in step. Adjusting state during render, as the Inspector does
+  // for its own fields, avoids an effect's extra commit and a stale first paint.
+  //
+  // Dragging volume previews onto the clip, which moves clipVolume as well --
+  // but to the same whole percent the slider is already showing, so the re-seed
+  // is a no-op mid-drag rather than a fight with the pointer.
+  const sliderKey = `${selected?.clip.id ?? ""}:${clipSpeed}:${clipVolume}`;
+  if (sliderSource !== sliderKey) {
+    setSliderSource(sliderKey);
+    setSpeed(clipSpeed);
+    setVolume(clipVolume);
+  }
 
   function report(text: string | null) {
     setMessage(text);
@@ -110,7 +144,7 @@ export function TimelineBar({ fps }: TimelineBarProps) {
           className={buttonClass}
           onClick={() => {
             setOpen(null);
-            report(pasteSelection(engine, playback.currentFrame));
+            report(pasteSelection(engine, playheadFrame()));
           }}
         >
           <ClipboardPaste className="h-3.5 w-3.5" />
@@ -147,7 +181,7 @@ export function TimelineBar({ fps }: TimelineBarProps) {
       </div>
 
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <span className="font-mono text-[12px] text-white">{framesToTimecode(playback.currentFrame, fps)}</span>
+        <Timecode fps={fps} />
       </div>
 
       {message && (

@@ -3,25 +3,53 @@
 import { useState, useRef } from "react";
 import { X, Download } from "lucide-react";
 import { exportVideo, useTimelineEngine } from "@elah/editor";
+import { saveExport } from "../api";
+import { Spinner } from "./chrome";
+import { useToast } from "./toast";
 
 interface ExportModalProps {
   onClose: () => void;
 }
 
-type ExportState = "idle" | "exporting" | "done" | "error";
+type ExportState = "idle" | "exporting" | "saving" | "done" | "error";
+
+/**
+ * What the encoder will actually write, by the rule the SDK uses internally:
+ * the picked number is the *short* edge, so a portrait project exports 1080
+ * wide rather than 1080 tall.
+ */
+function outputSize(stage: { width: number; height: number }, shortEdge: number) {
+  const scale = shortEdge / Math.min(stage.width, stage.height);
+  return {
+    width: Math.round((stage.width * scale) / 2) * 2,
+    height: Math.round((stage.height * scale) / 2) * 2,
+  };
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
 
 export function ExportModal({ onClose }: ExportModalProps) {
   const [state, setState] = useState<ExportState>("idle");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const [resolution, setResolution] = useState<"1080" | "720" | "480">("1080");
+  const [outcome, setOutcome] = useState<string>("");
   const abortRef = useRef<AbortController | null>(null);
   const engine = useTimelineEngine();
+  const toast = useToast();
 
   async function handleExport() {
     setState("exporting");
     setProgress(0);
     setErrorMsg("");
+    setOutcome("");
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -34,7 +62,9 @@ export function ExportModal({ onClose }: ExportModalProps) {
       const hasClips = Object.values(project.clips).some((c) => c.length > 0);
 
       if (!hasClips) {
-        setErrorMsg("Nothing on the timeline yet. Add some clips first.");
+        const empty = "Nothing on the timeline yet. Add some clips first.";
+        setErrorMsg(empty);
+        toast(empty, "error");
         setState("error");
         return;
       }
@@ -50,13 +80,33 @@ export function ExportModal({ onClose }: ExportModalProps) {
         },
       });
 
-      // Trigger download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `capfree-export-${Date.now()}.mp4`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      const filename = `capfree-export-${Date.now()}.mp4`;
+      const file = new File([blob], filename, { type: blob.type || "video/mp4" });
+      const size = outputSize(project.stage, outputHeight);
+
+      /*
+        Hand the finished file to the API so it lands in a folder the user can
+        find, and report the path it chose. If that fails the render must not
+        go with it, so the browser downloads it instead and the toast says so
+        -- re-encoding to recover from a missing API would be a poor trade.
+      */
+      setState("saving");
+      try {
+        const saved = await saveExport(file, {
+          fps: project.fps,
+          width: size.width,
+          height: size.height,
+          tracks: project.tracks.length,
+          clips: Object.values(project.clips).reduce((total, list) => total + list.length, 0),
+        });
+        setOutcome(`Saved to ${saved.path}`);
+        toast(`Exported to ${saved.path}`);
+      } catch (saveErr) {
+        downloadBlob(blob, filename);
+        const why = saveErr instanceof Error ? saveErr.message : "the API did not answer";
+        setOutcome(`Downloaded ${filename} — could not reach the export folder.`);
+        toast(`Export saved to your downloads instead: ${why}`, "error");
+      }
 
       setState("done");
     } catch (err: unknown) {
@@ -64,7 +114,9 @@ export function ExportModal({ onClose }: ExportModalProps) {
         setState("idle");
       } else {
         console.error(err);
-        setErrorMsg(err instanceof Error ? err.message : "Export failed");
+        const message = err instanceof Error ? err.message : "Export failed";
+        setErrorMsg(message);
+        toast(`Export failed: ${message}`, "error");
         setState("error");
       }
     }
@@ -130,8 +182,15 @@ export function ExportModal({ onClose }: ExportModalProps) {
             </div>
           )}
 
+          {state === "saving" && (
+            <span className="flex items-center gap-2 text-xs text-[#888]">
+              <Spinner />
+              Saving to the export folder…
+            </span>
+          )}
+
           {state === "done" && (
-            <p className="text-sm text-[#ffffff]">Download started!</p>
+            <p className="break-all text-sm text-[#ffffff]">{outcome || "Download started!"}</p>
           )}
 
           {state === "error" && (
@@ -147,6 +206,16 @@ export function ExportModal({ onClose }: ExportModalProps) {
               className="flex-1 py-2 rounded-xl border border-[#2a2a2e] text-sm text-[#888] hover:text-white transition-colors"
             >
               Cancel
+            </button>
+          ) : state === "saving" ? (
+            // The render is done and the upload is in flight; stopping here
+            // would throw the finished file away.
+            <button
+              disabled
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#2a2a2e] py-2 text-sm text-[#888] opacity-70"
+            >
+              <Spinner />
+              Saving…
             </button>
           ) : (
             <>

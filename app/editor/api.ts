@@ -66,6 +66,24 @@ export interface SilenceRange {
   duration: number;
 }
 
+export interface ExportSaveResponse {
+  /** Where the file ended up, as the API's own filesystem sees it. */
+  path: string;
+  folder: string;
+  filename: string;
+  bytes: number;
+  /** Read back from the written file; null when ffprobe could not say. */
+  duration: number | null;
+}
+
+export interface BeatsResponse {
+  /** Tempo librosa settled on, for display only. */
+  bpm: number;
+  duration: number;
+  /** Beat positions in seconds from the start of the analysed audio. */
+  beats: number[];
+}
+
 export interface SilenceDetectResponse {
   duration: number;
   silences: SilenceRange[];
@@ -206,11 +224,16 @@ async function getJson(path: string, params: Record<string, string>): Promise<un
   return response.json();
 }
 
+/**
+ * Whisper transcription of one media file. `language` goes over the wire as
+ * "auto" when the caller wants detection; the API reads that as "detect it
+ * yourself" rather than as a language code.
+ */
 export async function requestCaptions(file: File, language?: string): Promise<CaptionsResponse> {
   const body = new FormData();
   body.append("file", file);
   body.append("format", "json");
-  if (language && language !== "auto") body.append("language", language);
+  body.append("language", language || "auto");
   const response = await postForm("/captions", body);
   return response.json() as Promise<CaptionsResponse>;
 }
@@ -334,6 +357,53 @@ export async function requestBurnSubtitles(
   body.append("font", options.font);
   const response = await postForm("/subtitles/burn", body);
   return response.blob();
+}
+
+/**
+ * Hands a finished export to the API to store, and learns where it put it.
+ *
+ * The render stays in the browser -- that is where the media and the encoder
+ * are -- so what travels here is the finished file plus the shape of the
+ * project it came from, which the response echoes back for the editor to
+ * report.
+ */
+export async function saveExport(
+  file: File,
+  project: { fps: number; width: number; height: number; tracks: number; clips: number },
+): Promise<ExportSaveResponse> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("name", file.name);
+  body.append("fps", String(project.fps));
+  body.append("width", String(project.width));
+  body.append("height", String(project.height));
+  body.append("tracks", String(project.tracks));
+  body.append("clips", String(project.clips));
+  const response = await postForm("/export", body);
+  const data = (await response.json()) as Partial<ExportSaveResponse>;
+  if (typeof data.path !== "string") throw new ApiError("The API did not say where it saved the file.");
+  return {
+    path: data.path,
+    folder: data.folder ?? "",
+    filename: data.filename ?? file.name,
+    bytes: data.bytes ?? file.size,
+    duration: data.duration ?? null,
+  };
+}
+
+/**
+ * Tempo and beat positions for a file. Takes video as readily as audio -- the
+ * endpoint strips the picture before analysing -- so the timeline can snap its
+ * cuts to the beat without rendering anything.
+ */
+export async function requestBeats(file: File, maxDuration?: number): Promise<BeatsResponse> {
+  const body = new FormData();
+  // The endpoint calls the field `music` whatever the file turns out to be.
+  body.append("music", file);
+  if (maxDuration !== undefined) body.append("max_duration", String(maxDuration));
+  const response = await postForm("/beats", body);
+  const data = (await response.json()) as { bpm?: number; duration?: number; beats?: number[] };
+  return { bpm: data.bpm ?? 0, duration: data.duration ?? 0, beats: data.beats ?? [] };
 }
 
 export async function requestBeatSync(music: File, clips: File[]): Promise<Blob> {

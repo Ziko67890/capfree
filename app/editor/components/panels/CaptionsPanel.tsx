@@ -10,7 +10,7 @@ import { placeTextClip } from "../../clipEdit";
 import { SPOKEN_LANGUAGES } from "../../library";
 import { fileFromClip, swapClipMedia, targetVideoClip } from "../../timelineMedia";
 import { stamp, useApiJob } from "../../useApiJob";
-import { ErrorNote, PanelBody, PrimaryButton, QuietButton } from "../chrome";
+import { ErrorNote, PanelBody, PrimaryButton, QuietButton, Spinner } from "../chrome";
 import { useToast } from "../toast";
 
 const STYLES = [
@@ -84,6 +84,28 @@ export function CaptionsPanel({ fps }: { fps: number }) {
     toast("Caption added");
   }
 
+  /**
+   * Transcription is a first draft, so every segment stays editable here and
+   * whatever is on screen is what gets placed, burned, or written to SRT. The
+   * per-word timings come back from Whisper for the words it heard, so they are
+   * dropped on edit rather than left pointing at text that has changed.
+   */
+  function editLine(index: number, text: string) {
+    setTranscript((current) => {
+      if (!current) return current;
+      const lines = current.lines.map((line, at) =>
+        at === index ? { start: line.start, end: line.end, text } : line,
+      );
+      return { ...current, lines };
+    });
+  }
+
+  /** Puts the playhead on this segment, in timeline frames. */
+  function jumpTo(line: CaptionLine) {
+    if (!transcript) return;
+    seekFrame(transcript.offsetFrames + line.start * fps);
+  }
+
   function addAll() {
     if (!transcript) return;
     engine.batch(() => {
@@ -144,8 +166,14 @@ export function CaptionsPanel({ fps }: { fps: number }) {
         </label>
 
         <PrimaryButton onClick={runAutoCaptions} busy={job.busy === "captions"}>
-          {job.busy === "captions" ? "Transcribing…" : "Auto captions"}
+          {job.busy === "captions" ? "Transcribing…" : "Generate Captions"}
         </PrimaryButton>
+        {job.busy === "captions" && (
+          <p className="flex items-center gap-2 text-[11px] text-[#888899]">
+            <Spinner />
+            Transcribing on the CapFree API — this takes about as long as the clip.
+          </p>
+        )}
 
         <label className="text-[11px] text-[#888899]">
           Font
@@ -207,13 +235,19 @@ export function CaptionsPanel({ fps }: { fps: number }) {
                 >
                   <button
                     type="button"
-                    onClick={() => seekFrame(transcript.offsetFrames + line.start * fps)}
-                    title="Jump to this line"
-                    className="shrink-0 font-mono text-[10px] text-[#ffffff] transition-colors duration-150 hover:text-white"
+                    onClick={() => jumpTo(line)}
+                    title={`Jump to ${stamp(line.start)} – ${stamp(line.end)}`}
+                    className="shrink-0 pt-1 font-mono text-[10px] text-[#888899] transition-colors duration-150 hover:text-white"
                   >
                     {stamp(line.start)}
                   </button>
-                  <span className="flex-1 leading-snug">{line.text}</span>
+                  <input
+                    value={line.text}
+                    onChange={(event) => editLine(index, event.target.value)}
+                    onFocus={() => jumpTo(line)}
+                    aria-label={`Caption at ${stamp(line.start)}`}
+                    className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 leading-snug text-white outline-none transition-colors duration-150 hover:border-[#2a2a30] focus:border-[#ffffff]"
+                  />
                   <button
                     type="button"
                     onClick={() => addLine(line)}

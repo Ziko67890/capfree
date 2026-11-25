@@ -2,15 +2,11 @@
 
 import { useRef, useState } from "react";
 import { AudioLines, Eraser, Loader2, Music2, Scissors, type LucideIcon } from "lucide-react";
-import { importBlob, useTimelineEngine } from "@elah/editor";
-import { requestBackgroundRemoval, requestBeatSync, requestSilenceRemoval } from "../api";
-import {
-  fileFromClip,
-  replaceClipFile,
-  selectedImageClip,
-  selectedVisualClips,
-  targetVideoClip,
-} from "../timelineMedia";
+import { useTimelineEngine } from "@elah/editor";
+import { requestBackgroundRemoval, requestBeats, requestSilenceDetect } from "../api";
+import { cutSourceRanges, snapCutsToBeats, withCompanions } from "../timelineCuts";
+import { fileFromClip, replaceClipFile, selectedImageClip, targetVideoClip } from "../timelineMedia";
+import { useToast } from "./toast";
 
 /** Captions and vocal isolation live in their own panels, not here. */
 type ToolId = "silence" | "removebg" | "beats";
@@ -19,76 +15,94 @@ interface AIToolsPanelProps {
   fps: number;
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
+/** How much a clip may lose to reach a beat when the tempo came back unknown. */
+const FALLBACK_TRIM_FRAMES = 15;
 
 export function AIToolsPanel({ fps }: AIToolsPanelProps) {
   const engine = useTimelineEngine();
+  const toast = useToast();
   const musicInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<ToolId | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [music, setMusic] = useState<File | null>(null);
 
-  async function run(id: ToolId, task: () => Promise<void>) {
+  /**
+   * One job at a time; the task says what to report on success and throws with
+   * what to report on failure. Everything here is awaited network work plus a
+   * short engine edit, so the frame loop keeps running throughout.
+   */
+  async function run(id: ToolId, task: () => Promise<string>) {
     if (busy) return;
     setBusy(id);
-    setError(null);
     try {
-      await task();
+      toast(await task());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      toast(err instanceof Error ? err.message : "Something went wrong", "error");
     } finally {
       setBusy(null);
     }
   }
 
-  async function removeSilence() {
+  /**
+   * Detect, then cut on the timeline. /silence/remove would re-encode the file
+   * and hand back a new one, which costs a round trip of the whole video and
+   * replaces the clip's media; cutting the ranges here is instant and undoable.
+   */
+  async function removeSilence(): Promise<string> {
     const located = targetVideoClip(engine);
     if (!located) throw new Error("Add a video to the timeline first.");
-    const blob = await requestSilenceRemoval(await fileFromClip(located.clip));
-    const file = new File([blob], "trimmed.mp4", { type: "video/mp4" });
-    await replaceClipFile(engine, located, file, "video", fps);
+    const found = await requestSilenceDetect(await fileFromClip(located.clip));
+    if (found.silences.length === 0) {
+      return "No silences long enough to cut — the clip is unchanged.";
+    }
+    const result = cutSourceRanges(
+      engine,
+      withCompanions(engine, located),
+      found.silences,
+      fps,
+      "Remove silences",
+    );
+    if (result.cuts === 0) throw new Error("The silences fall outside this clip's trim.");
+    return `Cut ${result.cuts} silence${result.cuts === 1 ? "" : "s"} — ${result.secondsRemoved.toFixed(1)}s removed`;
   }
 
-  async function removeBackground() {
+  async function removeBackground(): Promise<string> {
     const located = selectedImageClip(engine);
     if (!located) throw new Error("Select an image clip first.");
     const blob = await requestBackgroundRemoval(await fileFromClip(located.clip));
     const file = new File([blob], "nobg.png", { type: "image/png" });
     await replaceClipFile(engine, located, file, "image", fps);
+    return "Background removed";
   }
 
-  async function beatSync() {
-    if (!music) throw new Error("Choose a music file first.");
-    const clips = selectedVisualClips(engine);
-    if (clips.length === 0) throw new Error("Select one or more video or image clips.");
-    if (clips.length > 20) throw new Error("Beat sync accepts at most 20 clips.");
+  /**
+   * Asks the API where the beats are, then moves the cuts between neighbouring
+   * clips onto them. The music file is used when one is chosen, since that is
+   * what the edit is meant to sit against; failing that the clip's own audio
+   * carries the tempo.
+   */
+  async function beatSync(): Promise<string> {
+    const located = targetVideoClip(engine);
+    if (!located) throw new Error("Add clips to the timeline first.");
 
-    const files = await Promise.all(clips.map((hit) => fileFromClip(hit.clip)));
-    const blob = await requestBeatSync(music, files);
-    const file = new File([blob], "beatsync.mp4", { type: "video/mp4" });
-    downloadBlob(file, file.name);
+    const source = music ?? (await fileFromClip(located.clip));
+    const { bpm, beats } = await requestBeats(source);
+    if (beats.length === 0) throw new Error("No beats found in that audio.");
 
-    const asset = await importBlob(file, { name: file.name, kind: "video" });
-    const project = engine.getProject();
-    const track =
-      project.tracks.find((item) => item.kind === "video") ??
-      engine.addTrack("video", { name: "Video" });
-    engine.addClip({
-      trackId: track.id,
-      type: "video",
-      src: asset.src,
-      assetId: asset.id,
-      name: "Beat sync",
-      startFrame: engine.getTotalFrames(),
-      durationFrames: Math.max(1, Math.round(asset.durationSec * fps)),
-    });
+    // A cut can only move back to the beat before it, which is at most one
+    // beat away — so that is the most a clip is allowed to give up. Any less
+    // and cuts that fall late in a bar could not reach a beat at all.
+    const maxTrim = bpm > 0 ? Math.max(2, Math.round((60 / bpm) * fps)) : FALLBACK_TRIM_FRAMES;
+    // The picture's audio twin, if it has one, is trimmed alongside it.
+    const tracks = [...new Set(withCompanions(engine, located).map((target) => target.trackId))];
+    const result = snapCutsToBeats(engine, tracks, beats, fps, maxTrim);
+
+    if (result.candidates === 0) {
+      throw new Error("Beat sync needs two clips in a row — there is no cut to snap yet.");
+    }
+    if (result.snapped === 0) {
+      return `${bpm} BPM — no cut was close enough to a beat to move.`;
+    }
+    return `${result.snapped} of ${result.candidates} cut${result.candidates === 1 ? "" : "s"} snapped to ${bpm} BPM`;
   }
 
   const tools: Array<{ id: ToolId; label: string; icon: LucideIcon; onClick: () => void }> = [
@@ -133,9 +147,7 @@ export function AIToolsPanel({ fps }: AIToolsPanelProps) {
           accept="audio/*"
           className="hidden"
           onChange={(event) => {
-            const file = event.target.files?.[0] ?? null;
-            setMusic(file);
-            setError(null);
+            setMusic(event.target.files?.[0] ?? null);
             event.target.value = "";
           }}
         />
@@ -146,7 +158,7 @@ export function AIToolsPanel({ fps }: AIToolsPanelProps) {
           className="flex items-center gap-2 w-full px-2.5 py-2 rounded-md bg-[#1c1c1f] border border-[#2a2a2e] text-left text-[12px] text-white hover:border-[#ffffff] disabled:opacity-50 transition-colors"
         >
           <Music2 className="w-3.5 h-3.5 shrink-0 text-[#ffffff]" />
-          <span className="truncate">{music ? music.name : "Choose music"}</span>
+          <span className="truncate">{music ? music.name : "Choose music (optional)"}</span>
         </button>
         <button
           type="button"
@@ -161,13 +173,11 @@ export function AIToolsPanel({ fps }: AIToolsPanelProps) {
           )}
           Beat Sync
         </button>
-      </div>
-
-      {error && (
-        <p role="alert" className="text-[11px] leading-snug text-red-400">
-          {error}
+        <p className="text-[10px] leading-snug text-[#888]">
+          Trims each clip back to the beat of the chosen music, or of the clip&rsquo;s own audio, so
+          every cut lands on one. Needs two clips in a row.
         </p>
-      )}
+      </div>
     </div>
   );
 }

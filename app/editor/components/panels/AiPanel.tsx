@@ -12,8 +12,7 @@ interface AiPanelProps {
   fps: number;
 }
 
-const PLACEHOLDER =
-  "Tell Claude what to edit... e.g. 'remove all silences' or 'add chill music'";
+const PLACEHOLDER = "Describe what you want to edit...";
 
 /** One tap each, so the panel is usable without typing. */
 const EXAMPLES = [
@@ -49,7 +48,7 @@ export function AiPanel({ fps }: AiPanelProps) {
     const controller = new AbortController();
     abortRef.current = controller;
     setBusy(true);
-    setStatus("Asking Claude…");
+    setStatus("Asking CapFree AI…");
 
     try {
       const { action, remaining: left } = await resolvePrompt(
@@ -102,7 +101,7 @@ export function AiPanel({ fps }: AiPanelProps) {
     <PanelBody>
       <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-white">
         <Sparkles className="h-3.5 w-3.5" aria-hidden />
-        AI
+        CapFree AI
       </h2>
       <p className="mt-0.5 text-[10px] leading-snug text-[#888899]">
         Describe an edit in plain words. Five free edits a day.
@@ -127,7 +126,7 @@ export function AiPanel({ fps }: AiPanelProps) {
             }
           }}
           placeholder={PLACEHOLDER}
-          aria-label="Tell Claude what to edit"
+          aria-label="Describe what you want to edit"
           rows={3}
           disabled={busy}
           className="w-full resize-none rounded-md border border-[#2a2a30] bg-[#1a1a1e] px-2 py-1.5 text-[12px] leading-snug text-white outline-none transition-colors placeholder:text-[#888899] focus:border-[#ffffff] disabled:opacity-60"

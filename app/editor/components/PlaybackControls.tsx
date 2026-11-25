@@ -1,11 +1,11 @@
 "use client";
 
+import { useRef } from "react";
 import { Play, Pause, SkipBack, Repeat } from "lucide-react";
-import { framesToSeconds } from "@elah/editor";
+import { framesToSeconds, playbackStore, usePlaybackStore } from "@elah/editor";
 
 interface PlaybackControlsProps {
   isPlaying: boolean;
-  currentFrame: number;
   totalFrames: number;
   fps: number;
   loop: boolean;
@@ -23,9 +23,93 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}.${ms}`;
 }
 
+/**
+ * The playhead readout and the scrub bar, split out from the controls so that
+ * the frame subscription lands here. During playback this is the only part of
+ * the editor React re-renders per frame; the transport buttons, their icons and
+ * everything above them stay untouched.
+ */
+function Scrubber({
+  totalFrames,
+  fps,
+  onSeek,
+}: {
+  totalFrames: number;
+  fps: number;
+  onSeek: (frame: number) => void;
+}) {
+  const currentFrame = usePlaybackStore((state) => state.currentFrame);
+  // Frames are zero-based, so the last one with a picture is one before the
+  // total. Letting the bar reach `totalFrames` parks the playhead a frame past
+  // the end of the project, where there is nothing left to draw.
+  const lastFrame = Math.max(totalFrames - 1, 0);
+  const percent = lastFrame > 0 ? (Math.min(currentFrame, lastFrame) / lastFrame) * 100 : 0;
+
+  /*
+    Scrubbing while the transport runs fights it: each change seeks the engine,
+    which re-anchors and keeps integrating from there, so the thumb runs away
+    from the pointer between events. The timeline's own needle handles this by
+    pausing for the length of the drag and resuming after, so this bar does the
+    same and the two scrubbers behave alike.
+
+    Both pointerup and lostpointercapture resume, because a slider dragged off
+    the window ends the gesture with whichever of the two the browser sends;
+    the flag makes the second one a no-op.
+  */
+  const resume = useRef(false);
+
+  function beginScrub() {
+    const playback = playbackStore.getState();
+    resume.current = playback.isPlaying;
+    if (playback.isPlaying) playback.pause();
+  }
+
+  function endScrub() {
+    if (!resume.current) return;
+    resume.current = false;
+    playbackStore.getState().play();
+  }
+
+  return (
+    <>
+      {/* Timecode */}
+      <span className="text-xs font-mono text-[#888] flex-shrink-0 w-[76px]">
+        {formatTime(framesToSeconds(currentFrame, fps))}
+      </span>
+
+      {/* Scrub bar */}
+      <div className="flex-1 relative h-1.5 bg-[#2a2a2e] rounded-full cursor-pointer group">
+        {/* Progress fill */}
+        <div
+          className="absolute left-0 top-0 h-full bg-[#ffffff] rounded-full pointer-events-none"
+          style={{ width: `${percent}%` }}
+        />
+        {/* Invisible range input for interaction */}
+        <input
+          type="range"
+          min={0}
+          max={Math.max(lastFrame, 1)}
+          value={Math.min(currentFrame, lastFrame)}
+          aria-label="Seek"
+          onChange={(e) => onSeek(Number(e.target.value))}
+          onPointerDown={beginScrub}
+          onPointerUp={endScrub}
+          onPointerCancel={endScrub}
+          onLostPointerCapture={endScrub}
+          className="absolute inset-0 w-full opacity-0 cursor-pointer"
+        />
+        {/* Thumb */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ left: `calc(${percent}% - 6px)` }}
+        />
+      </div>
+    </>
+  );
+}
+
 export function PlaybackControls({
   isPlaying,
-  currentFrame,
   totalFrames,
   fps,
   loop,
@@ -35,8 +119,6 @@ export function PlaybackControls({
   onSeek,
   onToggleLoop,
 }: PlaybackControlsProps) {
-  const currentSeconds = framesToSeconds(currentFrame, fps);
-
   return (
     <div className="flex items-center gap-3 w-full max-w-xl">
       {/* Return to start */}
@@ -70,34 +152,7 @@ export function PlaybackControls({
         <Repeat className="w-4 h-4" />
       </button>
 
-      {/* Timecode */}
-      <span className="text-xs font-mono text-[#888] flex-shrink-0 w-[76px]">
-        {formatTime(currentSeconds)}
-      </span>
-
-      {/* Scrub bar */}
-      <div className="flex-1 relative h-1.5 bg-[#2a2a2e] rounded-full cursor-pointer group">
-        {/* Progress fill */}
-        <div
-          className="absolute left-0 top-0 h-full bg-[#ffffff] rounded-full pointer-events-none"
-          style={{ width: totalFrames > 0 ? `${(currentFrame / totalFrames) * 100}%` : "0%" }}
-        />
-        {/* Invisible range input for interaction */}
-        <input
-          type="range"
-          min={0}
-          max={Math.max(totalFrames, 1)}
-          value={currentFrame}
-          aria-label="Seek"
-          onChange={(e) => onSeek(Number(e.target.value))}
-          className="absolute inset-0 w-full opacity-0 cursor-pointer"
-        />
-        {/* Thumb */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ left: totalFrames > 0 ? `calc(${(currentFrame / totalFrames) * 100}% - 6px)` : "-6px" }}
-        />
-      </div>
+      <Scrubber totalFrames={totalFrames} fps={fps} onSeek={onSeek} />
 
       {/* Total duration */}
       <span className="text-xs font-mono text-[#555] flex-shrink-0 w-[60px] text-right">

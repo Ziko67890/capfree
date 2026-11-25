@@ -43,29 +43,49 @@ export function VocalSplitPanel({ fps }: { fps: number }) {
   const job = useApiJob();
   const [stems, setStems] = useState<Partial<Record<StemId, Stem>>>({});
 
+  /**
+   * Places a stem on an audio track of its own, so vocals and music land as
+   * two separate clips that can be levelled, muted or moved independently.
+   * Re-adding the same stem gets its own track again rather than colliding
+   * with the clip already there.
+   */
+  async function place(id: StemId, stem: Stem) {
+    const label = id === "vocals" ? "Vocals" : "Music";
+    const track = engine.addTrack("audio", { name: label });
+    const clipId = await addAudioBlob(engine, stem.blob, label, stem.startFrame, track.id);
+    if (!clipId) {
+      engine.removeTrack(track.id);
+      throw new Error(`Could not place the ${label.toLowerCase()} track.`);
+    }
+    return label;
+  }
+
   function split(id: StemId) {
     job.run(id, async () => {
       const located = targetMediaClip(engine);
       if (!located) throw new Error("Add a video or audio clip to the timeline first.");
       const file = await fileFromClip(located.clip);
       const blob = id === "vocals" ? await requestVocalIsolation(file) : await requestVocalMusic(file);
+      const stem: Stem = {
+        blob,
+        url: URL.createObjectURL(blob),
+        startFrame: located.clip.startFrame,
+      };
       setStems((current) => {
         const previous = current[id];
         if (previous) URL.revokeObjectURL(previous.url);
-        return {
-          ...current,
-          [id]: { blob, url: URL.createObjectURL(blob), startFrame: located.clip.startFrame },
-        };
+        return { ...current, [id]: stem };
       });
-      toast(`${id === "vocals" ? "Vocals" : "Music"} ready`);
+      // Straight onto the timeline: the split is only useful once it is in the
+      // edit, and the preview below stays for checking and re-downloading it.
+      const label = await place(id, stem);
+      toast(`${label} split out and added to the timeline`);
     });
   }
 
   function addToTimeline(id: StemId, stem: Stem) {
-    const label = id === "vocals" ? "Vocals" : "Music";
     job.run(`add-${id}`, async () => {
-      const clipId = await addAudioBlob(engine, stem.blob, label, stem.startFrame);
-      if (!clipId) throw new Error(`Could not place the ${label.toLowerCase()} track.`);
+      const label = await place(id, stem);
       toast(`${label} added to the timeline`);
     });
   }
@@ -98,7 +118,7 @@ export function VocalSplitPanel({ fps }: { fps: number }) {
                     onClick={() => addToTimeline(stem.id, result)}
                     disabled={job.busy !== null}
                   >
-                    Add to timeline
+                    Add again
                   </QuietButton>
                   <QuietButton onClick={() => download(result.blob, `${stem.id}.mp3`)}>Download</QuietButton>
                   <audio controls src={result.url} className="mt-1 h-8 w-full" />

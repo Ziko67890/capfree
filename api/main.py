@@ -20,6 +20,7 @@ from fastapi.responses import PlainTextResponse
 
 from ai import router as ai_router
 from beats import router as beats_router
+from export import router as export_router
 from fillers import router as fillers_router
 from media import router as media_router
 from music import router as music_router
@@ -53,6 +54,7 @@ app.include_router(media_router)
 app.include_router(ai_router)
 app.include_router(removebg_router)
 app.include_router(beats_router)
+app.include_router(export_router)
 app.include_router(tts_router)
 app.include_router(tracking_router)
 app.include_router(vocals_router)
@@ -158,8 +160,11 @@ def captions(
         wav = os.path.join(tmp, "audio.wav")
         extract_audio(src, wav)
 
+        # "auto" is how the editor asks for detection; Whisper wants None for
+        # that, and would reject "auto" as a language code.
+        spoken = None if not language or language == "auto" else language
         segments, info = get_model().transcribe(
-            wav, language=language or None, word_timestamps=True, vad_filter=True
+            wav, language=spoken, word_timestamps=True, vad_filter=True
         )
         words = [
             {"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Scissors, Download, Settings, Undo2, Redo2 } from "lucide-react";
+import { useTimelineEngine, useTracksStore } from "@elah/editor";
 
 interface TopBarProps {
   onExport: () => void;
@@ -9,6 +10,16 @@ interface TopBarProps {
 }
 
 export function TopBar({ onExport, onSettings }: TopBarProps) {
+  // Same source as TimelineBar's own undo/redo pair: the engine does the work
+  // and the tracks store carries the two flags it syncs on every history
+  // change, so the two sets of buttons can never disagree.
+  const engine = useTimelineEngine();
+  const canUndo = useTracksStore((state) => state.canUndo);
+  const canRedo = useTracksStore((state) => state.canRedo);
+
+  const iconButtonClass =
+    "w-8 h-8 flex items-center justify-center rounded-md text-[#888] hover:text-white hover:bg-[#222] transition-colors disabled:pointer-events-none disabled:opacity-40";
+
   return (
     <header className="flex items-center h-12 px-4 border-b border-[#222] bg-[#111113] flex-shrink-0 gap-4">
       {/* Logo */}
@@ -27,14 +38,22 @@ export function TopBar({ onExport, onSettings }: TopBarProps) {
       {/* Actions */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
+          type="button"
           aria-label="Undo"
-          className="w-8 h-8 flex items-center justify-center rounded-md text-[#888] hover:text-white hover:bg-[#222] transition-colors"
+          title="Undo"
+          disabled={!canUndo}
+          onClick={() => engine.undo()}
+          className={iconButtonClass}
         >
           <Undo2 className="w-4 h-4" />
         </button>
         <button
+          type="button"
           aria-label="Redo"
-          className="w-8 h-8 flex items-center justify-center rounded-md text-[#888] hover:text-white hover:bg-[#222] transition-colors"
+          title="Redo"
+          disabled={!canRedo}
+          onClick={() => engine.redo()}
+          className={iconButtonClass}
         >
           <Redo2 className="w-4 h-4" />
         </button>

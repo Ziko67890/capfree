@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import { usePlaybackStore, useTimelineEngine } from "@elah/editor";
+import { playbackStore, useTimelineEngine } from "@elah/editor";
 import { requestBurnSubtitles, requestCaptions, requestSilenceRemoval } from "../../api";
 import { seekFrame } from "../../captionActions";
 import { SPOKEN_LANGUAGES } from "../../library";
@@ -63,7 +63,6 @@ export function TranscriptPanel({ fps, active }: { fps: number; active: boolean 
   const selected = useSelectedClip();
   const toast = useToast();
   const job = useApiJob();
-  const currentFrame = usePlaybackStore((state) => state.currentFrame);
 
   const [language, setLanguage] = useState("auto");
   const [doc, setDoc] = useState<TranscriptDoc | null>(null);
@@ -109,32 +108,48 @@ export function TranscriptPanel({ fps, active }: { fps: number; active: boolean 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, selectedVideoId]);
 
-  /** Highlight and scroll the playing word by touching the DOM, not React. */
+  /**
+   * Highlight and scroll the playing word by touching the DOM, not React.
+   *
+   * The playhead is read through a store subscription rather than a hook, so an
+   * advancing frame runs this handful of class toggles instead of re-rendering
+   * the panel and its whole word list thirty times a second.
+   */
   useEffect(() => {
     const root = scrollRef.current;
     if (!root || !doc) return;
     const located = engine.findClip(doc.clipId);
     if (!located) return;
-
     const offset = located.clip.startFrame - (located.clip.sourceStartFrame ?? 0);
-    const played = (currentFrame - offset) / fps;
 
-    let activeId: string | null = null;
-    for (const word of words) {
-      if (played >= word.displayStart && played < word.displayEnd) {
-        activeId = word.id;
-        break;
+    const highlight = (currentFrame: number) => {
+      const played = (currentFrame - offset) / fps;
+
+      let activeId: string | null = null;
+      for (const word of words) {
+        if (played >= word.displayStart && played < word.displayEnd) {
+          activeId = word.id;
+          break;
+        }
       }
-    }
 
-    for (const node of root.querySelectorAll<HTMLElement>("[data-word-id]")) {
-      const on = node.dataset.wordId === activeId;
-      node.classList.toggle("bg-[#ffffff]", on);
-      node.classList.toggle("text-black", on);
-      node.classList.toggle("rounded-sm", on);
-      if (on) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [currentFrame, doc, engine, fps, revision, words]);
+      for (const node of root.querySelectorAll<HTMLElement>("[data-word-id]")) {
+        const on = node.dataset.wordId === activeId;
+        node.classList.toggle("bg-[#ffffff]", on);
+        node.classList.toggle("text-black", on);
+        node.classList.toggle("rounded-sm", on);
+        if (on) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    };
+
+    highlight(playbackStore.getState().currentFrame);
+    let last = playbackStore.getState().currentFrame;
+    return playbackStore.subscribe((state) => {
+      if (state.currentFrame === last) return;
+      last = state.currentFrame;
+      highlight(last);
+    });
+  }, [doc, engine, fps, revision, words]);
 
   /** Word ids the caret selection touches. */
   function selectedWordIds(): string[] {
