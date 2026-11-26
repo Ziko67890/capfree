@@ -59,11 +59,11 @@ const TIMELINE_BAR_HEIGHT = 36;
 /** Bar + ruler (32) + two 56px tracks — kept compact so preview gets more height. */
 const TIMELINE_HEIGHT = 160;
 /**
- * The SDK's own default, stated here because usePlayheadFollow has to place the
- * needle by the same arithmetic the Timeline does. Passed to both so the two
- * cannot drift apart.
+ * Width of the track label column. usePlayheadFollow places the needle by the
+ * same arithmetic the Timeline does, so both are given this one value and
+ * cannot drift apart. `compactSidebar` keeps the labels legible at 80px.
  */
-const TIMELINE_SIDEBAR_WIDTH = 184;
+const TIMELINE_SIDEBAR_WIDTH = 80;
 
 /** How far a press may wander and still count as a click rather than a drag. */
 const CLICK_SLOP_PX = 4;
@@ -84,8 +84,6 @@ function reachedPicture(event: ReactMouseEvent<HTMLDivElement>): boolean {
 
 function EditorInner() {
   const previewRef = useRef<PreviewHandle>(null);
-  const stageWrapRef = useRef<HTMLDivElement>(null);
-  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
@@ -97,22 +95,6 @@ function EditorInner() {
   useAutoSave(pending === null);
   usePlayheadFollow(TIMELINE_SIDEBAR_WIDTH);
   useShortcuts(FPS);
-
-  // Compute the largest 16:9 box that fits the stage wrapper.
-  useEffect(() => {
-    const el = stageWrapRef.current;
-    if (!el) return;
-    const compute = () => {
-      const { width: W, height: H } = el.getBoundingClientRect();
-      const byWidth = { w: W, h: W * (9 / 16) };
-      const byHeight = { w: H * (16 / 9), h: H };
-      setStageSize(byHeight.w <= W ? byHeight : byWidth);
-    };
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   // Force Preview's ResizeObserver to fire after layout is fully painted.
   // The GpuRenderer reads container.clientWidth/clientHeight on first resize;
@@ -133,10 +115,62 @@ function EditorInner() {
   const setCurrentFrame = usePlaybackStore((state) => state.setCurrentFrame);
   const toggleLoop = usePlaybackStore((state) => state.toggleLoop);
   const totalFrames = useTracksStore((state) => state.totalFrames);
+  // The project's own frame shape, which the look overlays are sized against.
+  const stage = useTracksStore((state) => state.stage);
   const look = usePreviewLook();
   const selected = useSelectedClip();
   const hasSelection = selected !== null;
   const previewFilter = [look.filterCss, look.effectCss, look.adjustCss].filter(Boolean).join(" ");
+
+  /*
+    The stage is a fixed box of the project's own aspect, centred in a grey
+    surround -- CapCut's preview, where the picture reads as a sheet of media
+    sitting on the app rather than as the whole pane.
+
+    It is measured rather than expressed in CSS because the renderer needs real
+    pixels: GpuRenderer reads the container's clientWidth/clientHeight to size
+    its drawing buffer, then contain-fits the project inside it. Giving it a box
+    of exactly the project's aspect makes that fit exact, which is what removes
+    the letterbox -- the bands an edge-to-edge stage only moved from outside the
+    canvas to inside it.
+
+    Height-first, then clamped to the width available, so the picture is as
+    large as the shorter axis allows and never overflows the padding.
+  */
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [stageBox, setStageBox] = useState<{ width: number; height: number } | null>(null);
+  const aspect = stage.width / stage.height;
+
+  useEffect(() => {
+    const slot = slotRef.current;
+    if (!slot) return;
+
+    const fit = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) return;
+      let h = height;
+      let w = h * aspect;
+      if (w > width) {
+        w = width;
+        h = w / aspect;
+      }
+      const next = { width: Math.round(w), height: Math.round(h) };
+      setStageBox((previous) =>
+        previous && previous.width === next.width && previous.height === next.height
+          ? previous
+          : next,
+      );
+    };
+
+    // contentRect excludes the padding, which is exactly the space the stage
+    // may occupy. The observer also fires once on observe, so no initial
+    // measurement pass is needed.
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect) fit(rect.width, rect.height);
+    });
+    observer.observe(slot);
+    return () => observer.disconnect();
+  }, [aspect]);
 
   const totalSeconds = framesToSeconds(totalFrames, FPS);
 
@@ -245,7 +279,7 @@ function EditorInner() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#1a1a1e] text-white">
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-app)] text-white">
       <TopBar onExport={() => setShowExport(true)} onSettings={() => setShowSettings(true)} />
       {pending && (
         <RestoreBanner save={pending} onRestore={restoreSession} onDiscard={discardSession} />
@@ -257,30 +291,29 @@ function EditorInner() {
 
         {/* LEFT PANEL — fixed width, full content visible */}
         <div
-          className="shrink-0 border-r border-[#34343a] bg-[#1a1a1e] overflow-y-auto overflow-x-hidden"
+          className="shrink-0 overflow-y-auto overflow-x-hidden border-r border-[var(--border)] bg-[var(--bg-panel)]"
           style={{ width: 270, minWidth: 270 }}
         >
           <LeftPanel tab={tab} fps={FPS} onAssetActivate={handleAssetActivate} />
         </div>
 
         {/* CENTER — preview fills remaining space */}
-        <section
-          className="flex min-w-0 flex-1 flex-col bg-[#111113]"
-        >
-          {/* Preview area — takes all remaining vertical space */}
-          <div className="relative min-h-0 flex-1" ref={stageWrapRef}>
-            {/* 16:9 stage centred inside the available box */}
+        <section className="flex min-w-0 flex-1 flex-col bg-black">
+          {/* Preview area — grey surround, with the stage centred on it */}
+          <div
+            ref={slotRef}
+            className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#2a2a2e] p-5"
+          >
+            {/* A 16:9 sheet on the grey, not a fill of it. */}
             <div
-              className="capfree-stage overflow-hidden rounded-xl bg-black shadow-2xl"
+              className="capfree-stage relative shrink-0 overflow-hidden bg-black"
               onPointerDownCapture={recordStagePress}
               onClick={toggleFromStage}
               style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: stageSize.w,
-                height: stageSize.h,
+                width: stageBox?.width ?? 0,
+                height: stageBox?.height ?? 0,
+                borderRadius: 3,
+                boxShadow: "0 2px 24px rgba(0,0,0,0.6)",
                 filter: previewFilter || undefined,
               }}
             >
@@ -291,35 +324,53 @@ function EditorInner() {
                 enableAudio
                 demuxerFactory={demuxerFactory}
               />
-              {look.vignette > 0 && (
-                <div
-                  className="pointer-events-none absolute inset-0"
-                  style={{ boxShadow: `inset 0 0 ${40 + look.vignette * 1.4}px rgba(0,0,0,${0.25 + look.vignette / 180})` }}
-                />
-              )}
-              {look.grain > 0 && (
-                <div
-                  className="capfree-grain pointer-events-none absolute inset-0"
-                  style={{ opacity: (look.grain / 100) * 0.5 }}
-                />
-              )}
-              {look.reframe && (
-                <div
-                  className="pointer-events-none absolute border-2 border-[#ffffff]"
-                  style={{
-                    left: `${look.reframe.x * 100}%`,
-                    top: `${look.reframe.y * 100}%`,
-                    width: `${look.reframe.width * 100}%`,
-                    height: `${look.reframe.height * 100}%`,
-                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
-                  }}
-                />
-              )}
+              {/*
+                These three draw *on the picture*: a vignette over surrounding
+                black would be a frame around nothing, and the reframe guide
+                has to land where the image actually is. The stage is now cut
+                to the project's aspect, so this box fills it -- but it is
+                still expressed as that aspect, centred by margin, so a project
+                whose shape stops matching the stage keeps the overlays on the
+                image rather than on the padding.
+              */}
+              <div
+                className="pointer-events-none absolute inset-0 m-auto"
+                style={{
+                  aspectRatio: `${stage.width} / ${stage.height}`,
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                }}
+              >
+                {look.vignette > 0 && (
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{ boxShadow: `inset 0 0 ${40 + look.vignette * 1.4}px rgba(0,0,0,${0.25 + look.vignette / 180})` }}
+                  />
+                )}
+                {look.grain > 0 && (
+                  <div
+                    className="capfree-grain pointer-events-none absolute inset-0"
+                    style={{ opacity: (look.grain / 100) * 0.5 }}
+                  />
+                )}
+                {look.reframe && (
+                  <div
+                    className="pointer-events-none absolute border-2 border-[#ffffff]"
+                    style={{
+                      left: `${look.reframe.x * 100}%`,
+                      top: `${look.reframe.y * 100}%`,
+                      width: `${look.reframe.width * 100}%`,
+                      height: `${look.reframe.height * 100}%`,
+                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Playback controls — centered below preview */}
-          <div className="shrink-0 py-2">
+          {/* Playback controls — centred below the preview, on black */}
+          <div className="flex shrink-0 justify-center bg-black px-4 py-2.5">
             <PlaybackControls
               isPlaying={isPlaying}
               totalFrames={totalFrames}
@@ -336,17 +387,17 @@ function EditorInner() {
 
         {/* RIGHT PANEL — Inspector, fixed width, full content visible */}
         <div
-          className="shrink-0 border-l border-[#34343a] bg-[#1a1a1e] overflow-y-auto overflow-x-hidden transition-[width] duration-200 ease-out"
+          className="shrink-0 overflow-y-auto overflow-x-hidden border-l border-[var(--border)] bg-[var(--bg-panel)] transition-[width] duration-200 ease-out"
           style={{ width: hasSelection ? 280 : 0, minWidth: hasSelection ? 280 : 0 }}
           aria-hidden={!hasSelection}
           inert={!hasSelection}
         >
-          <InspectorPanel fps={FPS} />
+          <InspectorPanel fps={FPS} onOpenReframe={() => setTab("reframe")} />
         </div>
       </div>
 
       <div
-        className="flex shrink-0 flex-col overflow-hidden border-t border-[#34343a] bg-[#1a1a1e] transition-[height] duration-200 ease-out"
+        className="flex shrink-0 flex-col overflow-hidden border-t border-[var(--border)] bg-[var(--bg-panel)] transition-[height] duration-200 ease-out"
         style={{ height: timelineCollapsed ? TIMELINE_BAR_HEIGHT : TIMELINE_HEIGHT }}
       >
         <div className="flex shrink-0 items-stretch">
@@ -356,7 +407,7 @@ function EditorInner() {
             aria-expanded={!timelineCollapsed}
             title={timelineCollapsed ? "Show tracks" : "Hide tracks"}
             aria-label={timelineCollapsed ? "Show tracks" : "Hide tracks"}
-            className="flex w-7 shrink-0 items-center justify-center border-b border-r border-[#34343a] bg-[#2a2a2e] text-[#888] transition-colors hover:text-white"
+            className="flex w-7 shrink-0 items-center justify-center border-b border-r border-[var(--border)] bg-[var(--bg-panel2)] text-[var(--text-muted)] transition-colors hover:text-white"
           >
             {timelineCollapsed ? (
               <ChevronUp className="h-3.5 w-3.5" />
@@ -374,10 +425,21 @@ function EditorInner() {
           aria-hidden={timelineCollapsed}
           inert={timelineCollapsed}
         >
+          {/*
+            The SDK takes a class per part, which is how the clip colours and
+            the label column get set: a class passed for clipVideo or
+            clipAudio replaces the package's default background outright.
+          */}
           <Timeline
             className="h-full"
-            compactSidebar={false}
+            compactSidebar
             sidebarWidth={TIMELINE_SIDEBAR_WIDTH}
+            classNames={{
+              root: "bg-[var(--bg-panel)]",
+              trackLabel: "text-[11px] text-[var(--text-muted)]",
+              clipVideo: "bg-[#3a5fd5]",
+              clipAudio: "bg-[#2a7a4a]",
+            }}
           />
         </div>
       </div>
