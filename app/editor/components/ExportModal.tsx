@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { X, Download } from "lucide-react";
 import { exportVideo, useTimelineEngine } from "@elah/editor";
-import { saveExport } from "../api";
+import { saveExport, type ExportQuality, type ExportResolution } from "../api";
 import { Spinner } from "./chrome";
 import { useToast } from "./toast";
 
@@ -12,6 +12,23 @@ interface ExportModalProps {
 }
 
 type ExportState = "idle" | "exporting" | "saving" | "done" | "error";
+
+/**
+ * The two dropdowns. Both are named rather than numeric because the API takes
+ * the name and owns the mapping -- the CRFs here are labels, not the values
+ * that get sent, so the dialog cannot drift from what the encoder does.
+ */
+const RESOLUTIONS: { value: ExportResolution; label: string }[] = [
+  { value: "1080", label: "1080p (1920 × 1080)" },
+  { value: "720", label: "720p (1280 × 720)" },
+  { value: "480", label: "480p (854 × 480)" },
+];
+
+const QUALITIES: { value: ExportQuality; label: string }[] = [
+  { value: "high", label: "High — CRF 18, visually lossless" },
+  { value: "medium", label: "Medium — CRF 23" },
+  { value: "low", label: "Low — CRF 28, smallest file" },
+];
 
 /**
  * What the encoder will actually write, by the rule the SDK uses internally:
@@ -26,6 +43,11 @@ function outputSize(stage: { width: number; height: number }, shortEdge: number)
   };
 }
 
+const selectClass =
+  "w-full rounded-lg border border-[#2a2a2e] bg-[#2a2a2e] px-3 py-2 text-sm text-white " +
+  "transition-colors hover:border-[#444] focus:border-[var(--accent)] focus:outline-none " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -39,17 +61,22 @@ export function ExportModal({ onClose }: ExportModalProps) {
   const [state, setState] = useState<ExportState>("idle");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
-  const [resolution, setResolution] = useState<"1080" | "720" | "480">("1080");
+  const [resolution, setResolution] = useState<ExportResolution>("1080");
+  const [quality, setQuality] = useState<ExportQuality>("high");
   const [outcome, setOutcome] = useState<string>("");
+  const [note, setNote] = useState<string>("");
   const abortRef = useRef<AbortController | null>(null);
   const engine = useTimelineEngine();
   const toast = useToast();
+  // Neither dropdown may change once the render it describes is under way.
+  const busy = state === "exporting" || state === "saving";
 
   async function handleExport() {
     setState("exporting");
     setProgress(0);
     setErrorMsg("");
     setOutcome("");
+    setNote("");
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -85,10 +112,11 @@ export function ExportModal({ onClose }: ExportModalProps) {
       const size = outputSize(project.stage, outputHeight);
 
       /*
-        Hand the finished file to the API so it lands in a folder the user can
-        find, and report the path it chose. If that fails the render must not
-        go with it, so the browser downloads it instead and the toast says so
-        -- re-encoding to recover from a missing API would be a poor trade.
+        Hand the finished file to the API: it re-encodes to CapFree's one
+        profile, puts the result in a folder the user can find, and reports
+        the path it chose. If that fails the render must not go with it, so
+        the browser downloads it instead and the toast says so -- the file is
+        still H.264/AAC, just not normalised.
       */
       setState("saving");
       try {
@@ -98,8 +126,22 @@ export function ExportModal({ onClose }: ExportModalProps) {
           height: size.height,
           tracks: project.tracks.length,
           clips: Object.values(project.clips).reduce((total, list) => total + list.length, 0),
+          resolution,
+          quality,
         });
         setOutcome(`Saved to ${saved.path}`);
+        // What the API read back off the finished file, not what was asked
+        // for -- so a transcode that silently did not happen cannot be
+        // reported as though it had.
+        if (saved.transcoded && saved.width && saved.height) {
+          setNote(
+            `${saved.width}×${saved.height} · ${saved.videoCodec ?? "h264"}` +
+              `${saved.audioCodec ? ` + ${saved.audioCodec}` : ""}` +
+              `${saved.crf ? ` · CRF ${saved.crf}` : ""}`,
+          );
+        } else if (!saved.transcoded) {
+          setNote(`Saved as rendered — ${saved.warning ?? "the server did not re-encode it"}.`);
+        }
         toast(`Exported to ${saved.path}`);
       } catch (saveErr) {
         downloadBlob(blob, filename);
@@ -143,24 +185,44 @@ export function ExportModal({ onClose }: ExportModalProps) {
 
         {/* Body */}
         <div className="px-5 py-5 flex flex-col gap-4">
-          {/* Resolution picker */}
+          {/* Resolution */}
           <div>
-            <label className="block text-xs text-[#888] mb-2">Resolution</label>
-            <div className="flex gap-2">
-              {(["1080", "720", "480"] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setResolution(r)}
-                  className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                    resolution === r
-                      ? "bg-[#ffffff] text-black border-[#ffffff]"
-                      : "bg-transparent text-[#888] border-[#2a2a2e] hover:border-[#444]"
-                  }`}
-                >
-                  {r}p
-                </button>
+            <label htmlFor="export-resolution" className="mb-1.5 block text-xs text-[#888]">
+              Resolution
+            </label>
+            <select
+              id="export-resolution"
+              value={resolution}
+              disabled={busy}
+              onChange={(event) => setResolution(event.target.value as ExportResolution)}
+              className={selectClass}
+            >
+              {RESOLUTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
-            </div>
+            </select>
+          </div>
+
+          {/* Quality */}
+          <div>
+            <label htmlFor="export-quality" className="mb-1.5 block text-xs text-[#888]">
+              Quality
+            </label>
+            <select
+              id="export-quality"
+              value={quality}
+              disabled={busy}
+              onChange={(event) => setQuality(event.target.value as ExportQuality)}
+              className={selectClass}
+            >
+              {QUALITIES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Format note */}
@@ -185,12 +247,17 @@ export function ExportModal({ onClose }: ExportModalProps) {
           {state === "saving" && (
             <span className="flex items-center gap-2 text-xs text-[#888]">
               <Spinner />
-              Saving to the export folder…
+              {/* -preset slow is not quick on a long timeline; say so rather
+                  than let a long pause read as a hang. */}
+              Re-encoding and saving to the export folder…
             </span>
           )}
 
           {state === "done" && (
-            <p className="break-all text-sm text-[#ffffff]">{outcome || "Download started!"}</p>
+            <div className="flex flex-col gap-1">
+              <p className="break-all text-sm text-[#ffffff]">{outcome || "Download started!"}</p>
+              {note && <p className="break-all text-xs text-[#888]">{note}</p>}
+            </div>
           )}
 
           {state === "error" && (

@@ -66,6 +66,12 @@ export interface SilenceRange {
   duration: number;
 }
 
+/** The resolution dropdown. The value is the short edge, as a string. */
+export type ExportResolution = "1080" | "720" | "480";
+
+/** The quality dropdown, which the API turns into an x264 CRF. */
+export type ExportQuality = "high" | "medium" | "low";
+
 export interface ExportSaveResponse {
   /** Where the file ended up, as the API's own filesystem sees it. */
   path: string;
@@ -74,6 +80,20 @@ export interface ExportSaveResponse {
   bytes: number;
   /** Read back from the written file; null when ffprobe could not say. */
   duration: number | null;
+  /** Frame size on disk, also read back; null when ffprobe could not say. */
+  width: number | null;
+  height: number | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  /** The CRF the API encoded at, derived from `quality`. */
+  crf: number | null;
+  /**
+   * False when FFmpeg was missing or unhappy and the API kept the browser's
+   * own render instead. The file is still saved; it just is not at the size
+   * and quality that were asked for, and `warning` says why.
+   */
+  transcoded: boolean;
+  warning: string | null;
 }
 
 export interface BeatsResponse {
@@ -366,10 +386,23 @@ export async function requestBurnSubtitles(
  * are -- so what travels here is the finished file plus the shape of the
  * project it came from, which the response echoes back for the editor to
  * report.
+ *
+ * `resolution` and `quality` are what the API re-encodes to: it runs the file
+ * through FFmpeg to one fixed profile so that every export leaves CapFree the
+ * same shape, and those two choose the frame size and the CRF within it. The
+ * response says what actually landed on disk, read back with ffprobe.
  */
 export async function saveExport(
   file: File,
-  project: { fps: number; width: number; height: number; tracks: number; clips: number },
+  project: {
+    fps: number;
+    width: number;
+    height: number;
+    tracks: number;
+    clips: number;
+    resolution: ExportResolution;
+    quality: ExportQuality;
+  },
 ): Promise<ExportSaveResponse> {
   const body = new FormData();
   body.append("file", file);
@@ -379,8 +412,13 @@ export async function saveExport(
   body.append("height", String(project.height));
   body.append("tracks", String(project.tracks));
   body.append("clips", String(project.clips));
+  body.append("resolution", project.resolution);
+  body.append("quality", project.quality);
   const response = await postForm("/export", body);
-  const data = (await response.json()) as Partial<ExportSaveResponse>;
+  // The API answers in snake_case, as the rest of it does.
+  const data = (await response.json()) as Partial<
+    Omit<ExportSaveResponse, "videoCodec" | "audioCodec">
+  > & { video_codec?: string | null; audio_codec?: string | null };
   if (typeof data.path !== "string") throw new ApiError("The API did not say where it saved the file.");
   return {
     path: data.path,
@@ -388,6 +426,15 @@ export async function saveExport(
     filename: data.filename ?? file.name,
     bytes: data.bytes ?? file.size,
     duration: data.duration ?? null,
+    width: data.width ?? null,
+    height: data.height ?? null,
+    videoCodec: data.video_codec ?? null,
+    audioCodec: data.audio_codec ?? null,
+    crf: data.crf ?? null,
+    // Absent means an older API that only ever stored the upload, so treat
+    // the file as untranscoded rather than claiming a pass that never ran.
+    transcoded: data.transcoded ?? false,
+    warning: data.warning ?? null,
   };
 }
 
