@@ -3,7 +3,6 @@
 import {
   importBlob,
   insertMediaAsset,
-  playbackStore,
   type Clip,
   type TimelineEngine,
 } from "@elah/editor";
@@ -119,6 +118,26 @@ function freeElementsTrack(
     if (!busy) return existing.id;
   }
   throw new OpSkipped(`Every "${name}" track is busy at that point on the timeline.`);
+}
+
+/**
+ * An empty audio track called `name`, created if there is not one already.
+ *
+ * Empty rather than merely named: a second "add music" should not be dropped
+ * on top of the first, and the engine refuses an overlap anyway. So this
+ * walks "Music", "Music 2", "Music 3"… until it finds a lane with nothing on
+ * it, which is also what keeps each track removable on its own.
+ */
+function freeAudioTrack(engine: TimelineEngine, name: string): string {
+  for (let attempt = 1; attempt <= 12; attempt += 1) {
+    const trackName = attempt === 1 ? name : `${name} ${attempt}`;
+    const existing = engine
+      .getProject()
+      .tracks.find((track) => track.kind === "audio" && track.name === trackName);
+    if (!existing) return engine.addTrack("audio", { name: trackName }).id;
+    if (engine.getClipsOnTrack(existing.id).length === 0) return existing.id;
+  }
+  throw new OpSkipped(`Every "${name}" track already has something on it.`);
 }
 
 /* ---------------------------------------------------------------------------
@@ -263,21 +282,56 @@ async function addMusic(op: AiEditOperation, ctx: OpContext): Promise<AppliedEdi
   const track = found.tracks[0];
   if (!track) throw new OpSkipped(`No royalty-free music matched "${genre}".`);
 
+  /*
+    How far the picture runs, which is where the music has to stop. A stock
+    track is whatever length it happens to be -- the first one tried here was
+    3:14 over a twelve-second clip -- so dropped in whole it leaves minutes of
+    music playing over nothing, and the export is as long as the song.
+
+    Measured as the end of the last visual clip rather than the sum of their
+    durations: with a gap between two clips the sum stops short of where the
+    picture actually ends, and the music would cut out before the last shot.
+  */
+  const project = engine.getProject();
+  let videoEndFrame = 0;
+  for (const track_ of project.tracks) {
+    if (track_.kind !== "video") continue;
+    for (const clip of engine.getClipsOnTrack(track_.id)) {
+      if (clip.type !== "video" && clip.type !== "image") continue;
+      videoEndFrame = Math.max(videoEndFrame, clip.startFrame + clip.durationFrames);
+    }
+  }
+
   const blob = await requestMusicTrack(track.previewUrl);
-  const clipId = await addAudioBlob(engine, blob, track.title, playbackStore.getState().currentFrame);
+  /*
+    Its own lane, starting at frame 0. Backing music belongs *under* the
+    picture, and the clip's own audio is already sitting at frame 0 on the
+    track it came in on -- asked to put a second clip there, the engine finds
+    the next free slot instead and the song ends up playing after the video
+    rather than beneath it.
+  */
+  const lane = freeAudioTrack(engine, "Music");
+  const clipId = await addAudioBlob(engine, blob, track.title, 0, lane);
   if (!clipId) throw new OpSkipped("Could not place that track on the timeline.");
 
-  // Backing music sits under whatever else is there, which is what the
-  // operation's `volume` means.
   const volume = op.volume ?? 0.3;
   const placed = engine.findClip(clipId);
-  if (placed) engine.updateClip(clipId, placed.trackId, { volume });
+  if (!placed) throw new OpSkipped("The track did not stay on the timeline.");
 
+  // Whichever runs out first. A track shorter than the picture is left at its
+  // own length -- there is nothing to stretch it with -- and one longer than
+  // the picture is cut back to it.
+  const naturalFrames = placed.clip.durationFrames;
+  const durationFrames = videoEndFrame > 0 ? Math.min(naturalFrames, videoEndFrame) : naturalFrames;
+  engine.updateClip(clipId, placed.trackId, { volume, durationFrames });
+
+  const trimmed = durationFrames < naturalFrames;
   const credit = track.requiresAttribution ? ` · credit ${track.artist}` : "";
+  const fitted = trimmed ? " · trimmed to the video" : "";
   return {
     id: nextId(),
     tone: "orange",
-    label: `${genre} music — "${track.title}" at ${Math.round(volume * 100)}%${credit}`,
+    label: `${genre} music — "${track.title}" at ${Math.round(volume * 100)}%${fitted}${credit}`,
     undo: () => removeClips(engine, [clipId]),
   };
 }
@@ -325,7 +379,11 @@ function audioDuck(op: AiEditOperation, ctx: OpContext): AppliedEdit {
 }
 
 const GRADES: Record<string, string> = {
-  cinematic: "contrast(1.1) saturate(1.2) brightness(0.95)",
+  // Pushed harder than the usual gentle figures: at contrast 1.1 / brightness
+  // 0.95 the grade was invisible on dark footage, which is exactly the
+  // material people ask to grade. The sepia is a small warm cast, which is
+  // most of what reads as "cinematic" on a quick look.
+  cinematic: "contrast(1.15) saturate(1.3) brightness(0.88) sepia(0.08)",
   warm: "sepia(0.25) saturate(1.15) brightness(1.04)",
   cool: "hue-rotate(-10deg) saturate(1.1) brightness(0.98)",
 };
