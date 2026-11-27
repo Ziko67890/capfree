@@ -66,11 +66,19 @@ export interface SilenceRange {
   duration: number;
 }
 
-/** The resolution dropdown. The value is the short edge, as a string. */
-export type ExportResolution = "1080" | "720" | "480";
+/** The resolution dropdown. The value names a frame the API knows. */
+export type ExportResolution = "480" | "720" | "1080" | "2k" | "4k";
 
-/** The quality dropdown, which the API turns into an x264 CRF. */
-export type ExportQuality = "high" | "medium" | "low";
+/** The format dropdown: container and video codec, chosen together. */
+export type ExportFormat = "mp4-h264" | "mp4-h265" | "webm-vp9";
+
+/** The audio dropdown, as codec and bitrate. */
+export type ExportAudio = "aac-192" | "aac-128" | "mp3-320";
+
+export interface ExportFolderResponse {
+  folder: string;
+  freeBytes: number;
+}
 
 export interface ExportSaveResponse {
   /** Where the file ended up, as the API's own filesystem sees it. */
@@ -85,7 +93,7 @@ export interface ExportSaveResponse {
   height: number | null;
   videoCodec: string | null;
   audioCodec: string | null;
-  /** The CRF the API encoded at, derived from `quality`. */
+  /** The CRF the API encoded at. */
   crf: number | null;
   /**
    * False when FFmpeg was missing or unhappy and the API kept the browser's
@@ -380,6 +388,19 @@ export async function requestBurnSubtitles(
 }
 
 /**
+ * Where the API would save an export, so the dialog can show the path before
+ * there is a file to put there.
+ */
+export async function fetchExportFolder(): Promise<ExportFolderResponse> {
+  const data = (await getJson("/export/folder", {})) as {
+    folder?: string;
+    free_bytes?: number;
+  };
+  if (typeof data.folder !== "string") throw new ApiError("The API did not name an export folder.");
+  return { folder: data.folder, freeBytes: data.free_bytes ?? 0 };
+}
+
+/**
  * Hands a finished export to the API to store, and learns where it put it.
  *
  * The render stays in the browser -- that is where the media and the encoder
@@ -387,10 +408,11 @@ export async function requestBurnSubtitles(
  * project it came from, which the response echoes back for the editor to
  * report.
  *
- * `resolution` and `quality` are what the API re-encodes to: it runs the file
- * through FFmpeg to one fixed profile so that every export leaves CapFree the
- * same shape, and those two choose the frame size and the CRF within it. The
- * response says what actually landed on disk, read back with ffprobe.
+ * The settings are what the API re-encodes to: it runs the file through
+ * FFmpeg, so the frame, the frame rate, the container, the codecs and the CRF
+ * are all decided here rather than by whatever the browser's encoder offered.
+ * `quality` is the CRF itself. The response says what actually landed on
+ * disk, read back with ffprobe.
  */
 export async function saveExport(
   file: File,
@@ -400,20 +422,29 @@ export async function saveExport(
     height: number;
     tracks: number;
     clips: number;
+    name: string;
     resolution: ExportResolution;
-    quality: ExportQuality;
+    /** An x264/x265/VP9 CRF: lower is better and bigger. */
+    quality: number;
+    format: ExportFormat;
+    audio: ExportAudio;
+    /** Overrides the API's own export folder; must be inside the user's home. */
+    folder?: string;
   },
 ): Promise<ExportSaveResponse> {
   const body = new FormData();
   body.append("file", file);
-  body.append("name", file.name);
+  body.append("name", project.name);
   body.append("fps", String(project.fps));
   body.append("width", String(project.width));
   body.append("height", String(project.height));
   body.append("tracks", String(project.tracks));
   body.append("clips", String(project.clips));
   body.append("resolution", project.resolution);
-  body.append("quality", project.quality);
+  body.append("quality", String(project.quality));
+  body.append("format", project.format);
+  body.append("audio", project.audio);
+  if (project.folder) body.append("folder", project.folder);
   const response = await postForm("/export", body);
   // The API answers in snake_case, as the rest of it does.
   const data = (await response.json()) as Partial<

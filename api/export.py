@@ -43,11 +43,37 @@ EXPORT_TIMEOUT_SEC = int(os.getenv("EXPORT_TIMEOUT_SEC", "3600"))
 
 # What the editor's resolution dropdown sends, and the frame each one means.
 # 16:9 throughout, because the project stage is 1920x1080 and stays there.
-RESOLUTIONS = {"1080": (1920, 1080), "720": (1280, 720), "480": (854, 480)}
+RESOLUTIONS = {
+    "480": (854, 480),
+    "720": (1280, 720),
+    "1080": (1920, 1080),
+    "2k": (2560, 1440),
+    "4k": (3840, 2160),
+}
 
-# CRF is x264's quality knob: lower is better and larger. 18 is the usual
-# "visually lossless" figure, 23 the encoder's own default, 28 noticeably soft.
-QUALITY_CRF = {"high": 18, "medium": 23, "low": 28}
+# The format dropdown. The browser renders an intermediate and this is what it
+# gets re-encoded into, so the container the editor chose and the one written
+# here are the same choice.
+FORMATS = {
+    "mp4-h264": {"suffix": ".mp4", "vcodec": "libx264"},
+    "mp4-h265": {"suffix": ".mp4", "vcodec": "libx265"},
+    "webm-vp9": {"suffix": ".webm", "vcodec": "libvpx-vp9"},
+}
+
+# The audio dropdown, as (encoder, bitrate). WebM carries neither AAC nor MP3,
+# so a WebM export swaps the encoder for Opus at the same bitrate; the response
+# reports what ffprobe found rather than what was asked for.
+AUDIO = {
+    "aac-192": ("aac", "192k"),
+    "aac-128": ("aac", "128k"),
+    "mp3-320": ("libmp3lame", "320k"),
+}
+WEBM_AUDIO_CODEC = "libopus"
+
+# CRF is the quality knob: lower is better and larger. The editor offers 14,
+# 18, 23 and 28; the range here is x264's and x265's, and sits inside VP9's
+# wider 0-63, so one bound covers all three.
+CRF_MIN, CRF_MAX = 0, 51
 
 UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -58,10 +84,29 @@ def check_auth(x_api_key: Optional[str]):
         raise HTTPException(401, "Invalid API key")
 
 
-def export_dir() -> Path:
-    """Where exports land. EXPORT_DIR overrides; otherwise ~/Videos/CapFree."""
-    configured = os.getenv("EXPORT_DIR")
-    target = Path(configured) if configured else Path.home() / "Videos" / "CapFree"
+def export_dir(override: Optional[str] = None) -> Path:
+    """Where exports land. EXPORT_DIR sets it; otherwise ~/Videos/CapFree.
+
+    `override` is the folder the export dialog's "Change" offers, and it is
+    confined to the user's home directory. The API is a local process, but a
+    request body is still a request body: without the check, any caller that
+    reached this port could name a system path and have a file written there.
+    """
+    if override and override.strip():
+        candidate = Path(override.strip()).expanduser()
+        if not candidate.is_absolute():
+            raise HTTPException(400, "The export folder must be an absolute path")
+        try:
+            resolved = candidate.resolve()
+            home = Path.home().resolve()
+        except OSError as err:
+            raise HTTPException(400, f"Could not read that folder path: {err}") from err
+        if resolved != home and home not in resolved.parents:
+            raise HTTPException(400, "The export folder must be inside your home directory")
+        target = resolved
+    else:
+        configured = os.getenv("EXPORT_DIR")
+        target = Path(configured) if configured else Path.home() / "Videos" / "CapFree"
     try:
         target.mkdir(parents=True, exist_ok=True)
     except OSError as err:
@@ -69,14 +114,15 @@ def export_dir() -> Path:
     return target
 
 
-def safe_name(raw: Optional[str]) -> str:
+def safe_name(raw: Optional[str], suffix: str = ".mp4") -> str:
     """A basename the editor suggested, reduced to something safe to join.
 
-    Always .mp4: whatever container the browser handed over, what gets written
-    here is an MP4, so the name should not promise otherwise.
+    The suffix is the chosen format's, never the one the name carried: what
+    gets written here is whatever the format dropdown says, so the name should
+    not promise otherwise.
     """
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    fallback = f"capfree-export-{stamp}.mp4"
+    fallback = f"capfree-export-{stamp}{suffix}"
     if not raw:
         return fallback
 
@@ -85,7 +131,7 @@ def safe_name(raw: Optional[str]) -> str:
     if not candidate:
         return fallback
     # Leave room for the " (2)" an existing file would push on.
-    return f"{Path(candidate).stem[:110]}.mp4"
+    return f"{Path(candidate).stem[:110]}{suffix}"
 
 
 def unused_path(folder: Path, filename: str) -> Path:
@@ -125,45 +171,85 @@ def stream_to(upload: UploadFile, dest: Path) -> int:
 
 
 def ffmpeg_command(
-    src: Path, dest: Path, width: int, height: int, crf: int, fps: int
+    src: Path,
+    dest: Path,
+    width: int,
+    height: int,
+    crf: int,
+    fps: int,
+    fmt: str = "mp4-h264",
+    audio: str = "aac-192",
 ) -> List[str]:
-    """The single encode profile CapFree ships.
+    """The encode the export dialog's five controls add up to.
 
-    Only the frame size and the CRF vary, and only between the values the two
-    dropdowns in the export dialog offer. The rest is fixed:
+    Fixed across all of them:
 
-      libx264 + yuv420p   the one combination every player, phone and social
-                          uploader accepts; 4:2:0 in particular is what makes
-                          Instagram and WhatsApp take the file at all
-      -preset slow        more search per frame, so a smaller file at the same
-                          CRF -- the time is already being spent on an encode
-      -b:a 192k AAC       transparent for stereo music, and universally decoded
-      +faststart          moves the moov atom to the front, so the file starts
-                          playing before it has finished downloading
+      yuv420p             4:2:0 is what every player, phone and social uploader
+                          will take; it is why Instagram and WhatsApp accept
+                          the file at all
+      -vf scale / -r      the chosen frame and frame rate, forced, so the file
+                          does not inherit whatever the browser rendered at
+
+    Per codec:
+
+      libx264 / libx265   -preset slow: more search per frame, so a smaller
+                          file at the same CRF. H.265 is tagged hvc1, which is
+                          the tag QuickTime and iOS will play; the hev1 default
+                          is not.
+      libvpx-vp9          has no -preset. It also reads -crf as a cap unless
+                          -b:v 0 puts it in constant-quality mode, which is
+                          what the dropdown means by quality.
+
+    Audio follows the container: MP4 takes the dropdown's codec as-is and gets
+    +faststart, which moves the moov atom to the front so the file plays before
+    it has finished downloading. WebM carries neither AAC nor MP3, so it gets
+    Opus at the same bitrate, and faststart does not apply to it.
 
     Built as a list and run without a shell, so none of these values -- the
     filename included -- is ever parsed as a command.
     """
-    return [
+    spec = FORMATS[fmt]
+    acodec, abitrate = AUDIO[audio]
+    webm = spec["suffix"] == ".webm"
+
+    command = [
         "ffmpeg",
         "-nostdin",  # never block waiting on a console that is not there
         "-y",  # unused_path already reserved the name
         "-i", str(src),
-        "-c:v", "libx264",
+        "-c:v", spec["vcodec"],
         "-crf", str(crf),
-        "-preset", "slow",
+    ]
+    if spec["vcodec"] == "libvpx-vp9":
+        command += ["-b:v", "0", "-row-mt", "1", "-deadline", "good", "-cpu-used", "2"]
+    else:
+        command += ["-preset", "slow"]
+    if spec["vcodec"] == "libx265":
+        command += ["-tag:v", "hvc1"]
+
+    command += [
         "-vf", f"scale={width}:{height}",
         "-r", str(fps),
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-movflags", "+faststart",
-        str(dest),
+        "-c:a", WEBM_AUDIO_CODEC if webm else acodec,
+        "-b:a", abitrate,
     ]
+    if not webm:
+        command += ["-movflags", "+faststart"]
+
+    command.append(str(dest))
+    return command
 
 
 def transcode(
-    src: Path, dest: Path, width: int, height: int, crf: int, fps: int
+    src: Path,
+    dest: Path,
+    width: int,
+    height: int,
+    crf: int,
+    fps: int,
+    fmt: str = "mp4-h264",
+    audio: str = "aac-192",
 ) -> Optional[str]:
     """Re-encode `src` into `dest`. None on success, otherwise why not.
 
@@ -172,7 +258,7 @@ def transcode(
     """
     try:
         result = subprocess.run(
-            ffmpeg_command(src, dest, width, height, crf, fps),
+            ffmpeg_command(src, dest, width, height, crf, fps, fmt, audio),
             capture_output=True,
             text=True,
             timeout=EXPORT_TIMEOUT_SEC,
@@ -254,15 +340,19 @@ def export(
     clips: int = Form(0),
     name: Optional[str] = Form(None),
     resolution: str = Form("1080"),
-    quality: str = Form("high"),
+    quality: int = Form(23),
+    format: str = Form("mp4-h264"),
+    audio: str = Form("aac-192"),
+    folder: Optional[str] = Form(None),
     x_api_key: Optional[str] = Header(None),
 ):
-    """Transcode a rendered export to CapFree's profile and say where it went.
+    """Transcode a rendered export to the chosen profile and say where it went.
 
-    `file` is the finished video from the browser. `resolution` and `quality`
-    are the two dropdowns in the export dialog; the rest describes the project
-    it came from and is echoed back, so the editor can show what it saved
-    without keeping its own record of it.
+    `file` is the finished video from the browser. `resolution`, `quality` (an
+    x264/x265/VP9 CRF), `fps`, `format` and `audio` are the export dialog's
+    controls; `folder` is its "Change", confined to the user's home directory.
+    The rest describes the project the render came from and is echoed back, so
+    the editor can show what it saved without keeping its own record of it.
     """
     check_auth(x_api_key)
     if not 1 <= fps <= 240:
@@ -271,14 +361,19 @@ def export(
         raise HTTPException(400, "width and height must be between 0 and 7680")
     if resolution not in RESOLUTIONS:
         raise HTTPException(400, f"resolution must be one of: {', '.join(RESOLUTIONS)}")
-    if quality not in QUALITY_CRF:
-        raise HTTPException(400, f"quality must be one of: {', '.join(QUALITY_CRF)}")
+    if not CRF_MIN <= quality <= CRF_MAX:
+        raise HTTPException(400, f"quality (CRF) must be between {CRF_MIN} and {CRF_MAX}")
+    if format not in FORMATS:
+        raise HTTPException(400, f"format must be one of: {', '.join(FORMATS)}")
+    if audio not in AUDIO:
+        raise HTTPException(400, f"audio must be one of: {', '.join(AUDIO)}")
 
     out_width, out_height = RESOLUTIONS[resolution]
-    crf = QUALITY_CRF[quality]
+    crf = quality
+    suffix = FORMATS[format]["suffix"]
 
-    folder = export_dir()
-    dest = unused_path(folder, safe_name(name or file.filename))
+    destination = export_dir(folder)
+    dest = unused_path(destination, safe_name(name or file.filename, suffix))
 
     # The upload lands in a temp file first and FFmpeg writes the finished one
     # into the export folder, so a failed encode never leaves a half-written
@@ -287,7 +382,7 @@ def export(
     source = staging / "upload"
     try:
         stream_to(file, source)
-        problem = transcode(source, dest, out_width, out_height, crf, fps)
+        problem = transcode(source, dest, out_width, out_height, crf, fps, format, audio)
         if problem:
             # Keep the render rather than lose it to a missing or unhappy
             # FFmpeg. The browser already wrote H.264/AAC -- just not at the
@@ -300,7 +395,7 @@ def export(
     media = probe(dest)
     return {
         "path": str(dest),
-        "folder": str(folder),
+        "folder": str(destination),
         "filename": dest.name,
         "bytes": dest.stat().st_size,
         "duration": media["duration"],
@@ -314,6 +409,8 @@ def export(
         "resolution": resolution,
         "quality": quality,
         "crf": crf,
+        "format": format,
+        "audio": audio,
         "video_codec": media["video_codec"],
         "audio_codec": media["audio_codec"],
         "transcoded": problem is None,
