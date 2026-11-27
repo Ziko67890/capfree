@@ -46,7 +46,17 @@ export function LeftPanel({ tab, fps, onAssetActivate }: LeftPanelProps) {
     // `h-full overflow-y-auto` resolves to auto and never scrolls, and a tall
     // panel grows past the slot instead -- which leaves the AI panel's input
     // row below the fold.
-    <aside className="relative h-full w-[240px] shrink-0 overflow-hidden border-r border-[#2a2a30] bg-[#111114]">
+    // 280px, and the only place the panel's width is stated: its wrapper in
+    // EditorShell is a plain shrink-0 box that takes whatever this is.
+    //
+    // h-full is what gives the panes a definite height to lay out against.
+    // Without it the aside is sized by its content, PanelBody's own
+    // `h-full overflow-y-auto` resolves to auto and never scrolls, and a tall
+    // panel grows past the slot instead -- which leaves the AI panel's input
+    // row below the fold.
+    // The divider is drawn here and nowhere else: the wrapper in EditorShell
+    // used to draw one too, which stacked two rules down the same edge.
+    <aside className="relative h-full w-[280px] shrink-0 overflow-hidden border-r border-[var(--border)] bg-[#111114]">
       <Pane active={tab === "media"}><MediaPanel onAssetActivate={onAssetActivate} /></Pane>
       <Pane active={tab === "ai"}><AIPanel fps={fps} /></Pane>
       <Pane active={tab === "audio"}><AudioPanel /></Pane>

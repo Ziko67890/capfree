@@ -289,11 +289,17 @@ function EditorInner() {
       {/* Main editor body — three columns: left panel | preview | inspector */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
 
-        {/* LEFT PANEL — fixed width, full content visible */}
-        <div
-          className="shrink-0 overflow-y-auto overflow-x-hidden border-r border-[var(--border)] bg-[var(--bg-panel)]"
-          style={{ width: 270, minWidth: 270 }}
-        >
+        {/*
+          LEFT PANEL — one fixed width, held in LeftPanel's own aside.
+
+          This wrapper used to carry a width of its own, 30px wider than the
+          aside inside it, which showed as a dead strip down the right of
+          every tool. It is a plain shrink-0 box now, so the panel's width is
+          stated in exactly one place and the two cannot drift apart again.
+          The preview beside it is flex-1, so whatever the panel takes, the
+          preview gets the rest.
+        */}
+        <div className="flex shrink-0 overflow-hidden bg-[var(--bg-panel)]">
           <LeftPanel tab={tab} fps={FPS} onAssetActivate={handleAssetActivate} />
         </div>
 
