@@ -700,6 +700,81 @@ export async function requestAiPrompt(
   return response.json() as Promise<AiPromptResponse>;
 }
 
+/** One instruction from /ai-edit. The `op` decides which other fields are set. */
+export interface AiEditOperation {
+  op:
+    | "add_text"
+    | "add_captions"
+    | "trim_silences"
+    | "add_music"
+    | "audio_duck"
+    | "color_grade"
+    | "speed_ramp"
+    | "zoom_pan";
+  text?: string;
+  start?: number;
+  end?: number;
+  position?: string;
+  style?: string;
+  source?: string;
+  segments?: unknown[];
+  threshold_db?: number;
+  genre?: string;
+  volume?: number;
+  voice_ratio?: number;
+  preset?: string;
+  start_speed?: number;
+  end_speed?: number;
+  at?: string;
+}
+
+export interface AiEditResponse {
+  operations: AiEditOperation[];
+  description: string;
+  costTokens: number;
+}
+
+/**
+ * Reads an edit request in plain words and names the operations it means.
+ *
+ * Keyword matching on the API side, not a model -- which is why it answers at
+ * once and costs nothing. An empty `operations` with a description is the
+ * endpoint saying it did not recognise the request, not a failure.
+ */
+export async function requestAiEdit(
+  body: {
+    prompt: string;
+    clip_type: string;
+    clip_duration: number;
+    timeline_state: Record<string, unknown>;
+  },
+  signal?: AbortSignal,
+): Promise<AiEditResponse> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/ai-edit`, {
+      method: "POST",
+      signal,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw new ApiError(UNREACHABLE);
+  }
+  if (!response.ok) throw new ApiError(await readError(response));
+  const data = (await response.json()) as {
+    operations?: AiEditOperation[];
+    description?: string;
+    cost_tokens?: number;
+  };
+  return {
+    operations: data.operations ?? [],
+    description: data.description ?? "",
+    costTokens: data.cost_tokens ?? 0,
+  };
+}
+
 /**
  * Queues background removal and returns at once with a job id. The work is
  * minutes of CPU per clip, so it is polled rather than awaited.

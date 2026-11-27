@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import type { AssetActivationPayload } from "@elah/editor";
 import type { EditorTab } from "./ToolBar";
 import { ToastDock } from "./toast";
+import { AIPanel } from "./AIPanel";
 import { AIToolsPanel } from "./AIToolsPanel";
-import { AiPanel } from "./panels/AiPanel";
 import { AudioPanel } from "./panels/AudioPanel";
 import { AvatarPanel } from "./panels/AvatarPanel";
 import { CaptionsPanel } from "./panels/CaptionsPanel";
@@ -41,9 +41,14 @@ function Pane({ active, children }: { active: boolean; children: ReactNode }) {
 /** Panels stay mounted so searches, transcripts, and slider values survive tab changes. */
 export function LeftPanel({ tab, fps, onAssetActivate }: LeftPanelProps) {
   return (
-    <aside className="relative w-[240px] shrink-0 overflow-hidden border-r border-[#2a2a30] bg-[#111114]">
+    // h-full is what gives the panes a definite height to lay out against.
+    // Without it the aside is sized by its content, PanelBody's own
+    // `h-full overflow-y-auto` resolves to auto and never scrolls, and a tall
+    // panel grows past the slot instead -- which leaves the AI panel's input
+    // row below the fold.
+    <aside className="relative h-full w-[240px] shrink-0 overflow-hidden border-r border-[#2a2a30] bg-[#111114]">
       <Pane active={tab === "media"}><MediaPanel onAssetActivate={onAssetActivate} /></Pane>
-      <Pane active={tab === "ai"}><AiPanel fps={fps} /></Pane>
+      <Pane active={tab === "ai"}><AIPanel fps={fps} /></Pane>
       <Pane active={tab === "audio"}><AudioPanel /></Pane>
       <Pane active={tab === "music"}><MusicPanel /></Pane>
       <Pane active={tab === "text"}><TextPanel fps={fps} /></Pane>

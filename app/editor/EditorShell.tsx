@@ -298,7 +298,7 @@ function EditorInner() {
         </div>
 
         {/* CENTER — preview fills remaining space */}
-        <section className="flex min-w-0 flex-1 flex-col bg-black">
+        <section className="flex min-w-0 flex-1 flex-col bg-[#2a2a2e]">
           {/* Preview area — grey surround, with the stage centred on it */}
           <div
             ref={slotRef}
@@ -306,7 +306,12 @@ function EditorInner() {
           >
             {/* A 16:9 sheet on the grey, not a fill of it. */}
             <div
-              className="capfree-stage relative shrink-0 overflow-hidden bg-black"
+              // The motion class drives a keyframed transform on the canvas --
+              // the Ken Burns push an AI edit can turn on. overflow-hidden
+              // above is what makes scaling past 1 crop rather than spill.
+              className={`capfree-stage relative shrink-0 overflow-hidden bg-black${
+                look.motionCss ? ` capfree-motion-${look.motionCss}` : ""
+              }`}
               onPointerDownCapture={recordStagePress}
               onClick={toggleFromStage}
               style={{
@@ -370,7 +375,7 @@ function EditorInner() {
           </div>
 
           {/* Playback controls — centred below the preview, on black */}
-          <div className="flex shrink-0 justify-center bg-black px-4 py-2.5">
+          <div className="flex shrink-0 justify-center bg-[#1a1a1e] px-4 py-2.5">
             <PlaybackControls
               isPlaying={isPlaying}
               totalFrames={totalFrames}

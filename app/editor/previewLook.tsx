@@ -2,6 +2,12 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
+/** A stretch of the timeline, in seconds from its start. */
+export interface TimeRange {
+  start: number;
+  end: number;
+}
+
 export interface CropRect {
   x: number;
   y: number;
@@ -18,10 +24,20 @@ interface Look {
   reframe: CropRect | null;
   activeFilter: string | null;
   activeEffect: string | null;
+  /** A CSS transform for the stage -- the Ken Burns push, when one is on. */
+  motionCss: string;
+  activeMotion: string | null;
+  /**
+   * Stretches the editor has been told are silent, drawn on the scrub bar.
+   * A marking, not a cut: nothing on the timeline changes because of it.
+   */
+  silences: TimeRange[];
   setFilter: (name: string | null, css: string) => void;
   setEffect: (name: string | null, css: string) => void;
   setAdjust: (css: string, vignette: number, grain?: number) => void;
   setReframe: (rect: CropRect | null) => void;
+  setMotion: (name: string | null, css: string) => void;
+  setSilences: (ranges: TimeRange[]) => void;
 }
 
 const LookContext = createContext<Look | null>(null);
@@ -35,6 +51,9 @@ export function PreviewLookProvider({ children }: { children: ReactNode }) {
   const [vignette, setVignette] = useState(0);
   const [grain, setGrain] = useState(0);
   const [reframe, setReframe] = useState<CropRect | null>(null);
+  const [motionCss, setMotionCss] = useState("");
+  const [activeMotion, setActiveMotion] = useState<string | null>(null);
+  const [silences, setSilences] = useState<TimeRange[]>([]);
 
   const value = useMemo<Look>(
     () => ({
@@ -46,6 +65,9 @@ export function PreviewLookProvider({ children }: { children: ReactNode }) {
       reframe,
       activeFilter,
       activeEffect,
+      motionCss,
+      activeMotion,
+      silences,
       setFilter: (name, css) => {
         setActiveFilter(name);
         setFilterCss(css);
@@ -60,8 +82,25 @@ export function PreviewLookProvider({ children }: { children: ReactNode }) {
         setGrain(noise);
       },
       setReframe,
+      setMotion: (name, css) => {
+        setActiveMotion(name);
+        setMotionCss(css);
+      },
+      setSilences,
     }),
-    [activeEffect, activeFilter, adjustCss, effectCss, filterCss, grain, reframe, vignette],
+    [
+      activeEffect,
+      activeFilter,
+      activeMotion,
+      adjustCss,
+      effectCss,
+      filterCss,
+      grain,
+      motionCss,
+      reframe,
+      silences,
+      vignette,
+    ],
   );
 
   return <LookContext.Provider value={value}>{children}</LookContext.Provider>;

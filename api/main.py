@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
 from ai import router as ai_router
+from ai_edit import router as ai_edit_router
 from beats import router as beats_router
 from export import router as export_router
 from fillers import router as fillers_router
@@ -52,6 +53,7 @@ app.include_router(fillers_router)
 app.include_router(music_router)
 app.include_router(media_router)
 app.include_router(ai_router)
+app.include_router(ai_edit_router)
 app.include_router(removebg_router)
 app.include_router(beats_router)
 app.include_router(export_router)

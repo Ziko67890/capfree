@@ -40,6 +40,22 @@ body {
    per-clip-type colours are deliberately left alone: clip colours encode clip
    type, and the dark surfaces stay as they are.
    --------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   Editor palette.
+
+   Every surface, border and accent in the editor chrome comes from these six.
+   Declared on :root so both the Tailwind arbitrary values in the components
+   (bg-[var(--bg-panel)]) and the plain CSS further down read the same values.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg-app: #111113;
+  --bg-panel: #1a1a1e;
+  --bg-panel2: #2a2a2e;
+  --border: #34343a;
+  --accent: #5b5ef4;
+  --text-muted: #888;
+}
+
 :root {
   --elah-accent: #ffffff;
   --elah-accent-hover: #e6e6e6;
@@ -414,4 +430,168 @@ html[data-theme="dark"] .capfree-landing {
    --------------------------------------------------------------------------- */
 .capfree-stage canvas {
   object-fit: contain;
+}
+
+/* ---------------------------------------------------------------------------
+   Floating Resize / Crop switch.
+
+   Selecting a media clip makes the SDK's own Preview draw a small toolbar
+   above the clip -- MediaTransformOverlay's ModeToggle, which flips its handles
+   between resizing and cropping. Those controls belong in the Inspector, not
+   over the picture. Preview takes no prop to turn it off and the markup is
+   inside @elah/editor, so this is where it comes off.
+
+   It is the only aria-pressed control any of the preview overlays render,
+   which is what makes this selector exact: the selection backdrop, the move
+   boxes and the eight resize handles are all untouched. display:none also
+   takes it out of hit testing, so a click where it used to sit now reaches the
+   clip underneath.
+
+   The toggle's mode is local state in that component, defaulting to 'resize',
+   so the handles stay resize handles with the switch gone.
+
+   !important is load-bearing here, not a shortcut: the component sets
+   `display: flex` inline, and an inline declaration outranks every selector in
+   a stylesheet however specific. This is the one thing that can outrank it.
+   --------------------------------------------------------------------------- */
+.capfree-stage div:has(> button[aria-pressed]) {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Inspector fields.
+
+   The panel has a few dozen inputs across text, number, select and range, and
+   giving each one the same four utility classes would bury the markup. These
+   are the ones a class per element buys nothing for, so they are set once here
+   against the panel's own class.
+   --------------------------------------------------------------------------- */
+.capfree-inspector input[type="text"],
+.capfree-inspector input[type="number"],
+.capfree-inspector input[type="color"],
+.capfree-inspector select,
+.capfree-inspector textarea {
+  background: var(--bg-panel2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: #ffffff;
+}
+
+.capfree-inspector input[type="text"]:focus,
+.capfree-inspector input[type="number"]:focus,
+.capfree-inspector select:focus,
+.capfree-inspector textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Inspector sliders.
+
+   `accent-color` alone would colour the fill but leaves the track at the
+   browser's default height, so the track and thumb are drawn explicitly. The
+   fill left of the thumb is the one part a range input will not expose: it
+   comes from a gradient sized by --fill, which the component sets per value.
+   --------------------------------------------------------------------------- */
+.capfree-inspector input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.capfree-inspector input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill, 0%),
+    var(--bg-panel2) var(--fill, 0%) 100%
+  );
+}
+
+.capfree-inspector input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+}
+
+.capfree-inspector input[type="range"]:disabled {
+  cursor: default;
+}
+
+/* The timeline's own sliders and the scrub bar are drawn by their components;
+   only the inspector's native ranges need this treatment. */
+
+/* ---------------------------------------------------------------------------
+   CapFree AI panel.
+
+   Two things the panel cannot express as utilities: the staggered pulse of
+   the thinking dots, and the Ken Burns push an AI edit can put on the
+   preview. Both are keyframes, which Tailwind has no arbitrary syntax for.
+   --------------------------------------------------------------------------- */
+@keyframes capfree-ai-blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+.capfree-ai-dot {
+  animation: capfree-ai-blink 1.2s infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Preview motion.
+
+   A slow push rather than a jump, so it reads as a camera move. The stage
+   clips its own overflow, so scaling past 1 crops rather than spilling, which
+   is what a Ken Burns is. `transform-origin` is what makes the two differ:
+   the drift comes from moving the origin, not from animating a translate.
+   --------------------------------------------------------------------------- */
+@keyframes capfree-kenburns {
+  from {
+    transform: scale(1) translate(0, 0);
+  }
+  to {
+    transform: scale(1.12) translate(-2%, 1.5%);
+  }
+}
+
+@keyframes capfree-pushin {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.15);
+  }
+}
+
+.capfree-motion-kenburns canvas {
+  animation: capfree-kenburns 12s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.capfree-motion-pushin canvas {
+  animation: capfree-pushin 8s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capfree-ai-dot,
+  .capfree-motion-kenburns canvas,
+  .capfree-motion-pushin canvas {
+    animation: none;
+  }
 }
