@@ -122,17 +122,7 @@ export function AIPanel({ fps }: AIPanelProps) {
 
   function resize(element: HTMLTextAreaElement) {
     element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 80)}px`;
-  }
-
-  function fillPrompt(text: string) {
-    setPrompt(text);
-    const element = inputRef.current;
-    if (element) {
-      element.focus();
-      // Next frame, so the new value is laid out before it is measured.
-      requestAnimationFrame(() => resize(element));
-    }
+    element.style.height = `${Math.min(element.scrollHeight, 72)}px`;
   }
 
   function undoEdit(edit: AppliedEdit) {
@@ -223,19 +213,13 @@ export function AIPanel({ fps }: AIPanelProps) {
     <div className="flex h-full min-h-0 flex-col" data-capfree-ai>
       {/* Header */}
       <div className="shrink-0 border-b border-[var(--border)] px-4 pb-2.5 pt-3.5">
-        <div className="mb-1 flex items-center gap-2 text-[13px] font-semibold text-white">
+        <div className="flex items-center gap-2 text-[13px] font-semibold text-white">
           <Sparkles className="h-4 w-4 text-[var(--accent)]" aria-hidden />
           CapFree AI
           <span className="rounded-full bg-[rgba(91,94,244,0.15)] px-[7px] py-0.5 text-[10px] font-semibold tracking-[0.3px] text-[var(--accent)]">
             BETA
           </span>
         </div>
-        <p className="text-[11.5px] leading-snug text-[var(--text-muted)]">
-          Describe an edit in plain words.{" "}
-          <span className="font-semibold text-[var(--accent)]">
-            {remaining} free edit{remaining === 1 ? "" : "s"} left today.
-          </span>
-        </p>
       </div>
 
       {/* Active clip context */}
@@ -261,9 +245,18 @@ export function AIPanel({ fps }: AIPanelProps) {
       {/* Conversation */}
       <div ref={scrollRef} className="capfree-scroll flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-3.5 py-3">
         {messages.length === 0 && !busy && (
-          <p className="text-[11.5px] leading-relaxed text-[#555568]">
-            Ask for an edit, or tap one of the suggestions below.
-          </p>
+          // Centred in the whole messages area rather than sitting at the top
+          // of it, so an empty panel reads as an invitation and not as a
+          // conversation that has lost its history.
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 px-4 text-center">
+            <span className="text-[26px] leading-none" aria-hidden>
+              ✨
+            </span>
+            <p className="text-[13px] font-semibold text-white">CapFree AI</p>
+            <p className="text-[11.5px] leading-snug text-[var(--text-muted)]">
+              Describe an edit in plain words
+            </p>
+          </div>
         )}
 
         {messages.map((message) =>
@@ -344,7 +337,7 @@ export function AIPanel({ fps }: AIPanelProps) {
               key={quick.label}
               type="button"
               disabled={busy}
-              onClick={() => fillPrompt(quick.prompt ?? quick.label)}
+              onClick={() => void send(quick.prompt ?? quick.label)}
               className="rounded-[7px] border border-[var(--border)] bg-[var(--bg-panel2)] px-2.5 py-1.5 text-left text-[11.5px] leading-tight text-[var(--text-muted)] transition-colors hover:border-[var(--accent)] hover:bg-[rgba(91,94,244,0.15)] hover:text-white disabled:opacity-40"
             >
               <span className="mr-1">{quick.icon}</span>
@@ -353,6 +346,14 @@ export function AIPanel({ fps }: AIPanelProps) {
           ))}
         </div>
       </div>
+
+      {/* What is left of today's allowance, where the eye lands before typing */}
+      <p className="shrink-0 px-3.5 pt-2 text-right text-[10.5px] text-[var(--text-muted)]">
+        <span className={remaining === 0 ? "text-[#f59e0b]" : "text-[var(--accent)]"}>
+          {remaining}
+        </span>{" "}
+        free edit{remaining === 1 ? "" : "s"} left today
+      </p>
 
       {/* Input */}
       <div className="shrink-0 border-t border-[var(--border)] px-3.5 pb-3 pt-2.5">
@@ -375,7 +376,7 @@ export function AIPanel({ fps }: AIPanelProps) {
                 void send(prompt);
               }
             }}
-            className="max-h-20 min-h-5 flex-1 resize-none bg-transparent text-[12.5px] leading-snug text-white outline-none placeholder:text-[#555568] disabled:opacity-60"
+            className="max-h-[72px] min-h-5 flex-1 resize-none bg-transparent text-[12.5px] leading-snug text-white outline-none placeholder:text-[#555568] disabled:opacity-60"
           />
           <button
             type="button"
