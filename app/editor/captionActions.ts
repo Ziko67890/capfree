@@ -45,25 +45,31 @@ function captionTrack(engine: TimelineEngine, name: string): string {
   return engine.addTrack("elements", { name }).id;
 }
 
-export function placeTimedCaption(
+export interface CaptionPlacement {
+  trackName?: string;
+  /** An existing track to place on, instead of looking one up by name. */
+  trackId?: string;
+  y?: number;
+}
+
+/** The one place a caption clip is built, so every caller lays them out alike. */
+function addCaptionClip(
   engine: TimelineEngine,
-  fps: number,
-  line: Pick<CaptionLine, "start" | "end" | "text">,
-  offsetFrames: number,
+  trackId: string,
+  text: string,
+  startFrame: number,
+  durationFrames: number,
   style: TextStyle,
-  options?: { trackName?: string; y?: number },
+  y: number,
 ): Clip {
-  const trackId = captionTrack(engine, options?.trackName ?? "Captions");
-  const durationSec = Math.max(0.35, line.end - line.start);
-  const startFrame = Math.max(0, offsetFrames + Math.round(line.start * fps));
   const clip = engine.addClip({
     trackId,
     type: "text",
-    name: line.text.slice(0, 48) || "Caption",
+    name: text.slice(0, 48) || "Caption",
     startFrame,
-    durationFrames: Math.max(1, Math.round(durationSec * fps)),
+    durationFrames,
     text: {
-      content: line.text,
+      content: text,
       fontSize: style.fontSize,
       color: style.color,
       fontFamily: style.fontFamily,
@@ -72,7 +78,7 @@ export function placeTimedCaption(
     },
     transform: {
       x: 0.5,
-      y: options?.y ?? 0.86,
+      y,
       scale: 1,
       rotation: 0,
       anchor: { x: 0.5, y: 0.5 },
@@ -80,6 +86,86 @@ export function placeTimedCaption(
   });
   captionIds.add(clip.id);
   return clip;
+}
+
+export function placeTimedCaption(
+  engine: TimelineEngine,
+  fps: number,
+  line: Pick<CaptionLine, "start" | "end" | "text">,
+  offsetFrames: number,
+  style: TextStyle,
+  options?: CaptionPlacement,
+): Clip {
+  const trackId = options?.trackId ?? captionTrack(engine, options?.trackName ?? "Captions");
+  const durationSec = Math.max(0.35, line.end - line.start);
+  return addCaptionClip(
+    engine,
+    trackId,
+    line.text,
+    Math.max(0, offsetFrames + Math.round(line.start * fps)),
+    Math.max(1, Math.round(durationSec * fps)),
+    style,
+    options?.y ?? 0.86,
+  );
+}
+
+/**
+ * A whole transcript laid down at once, which is the only way to lay one down
+ * safely.
+ *
+ * Placing captions one at a time cannot work, because a transcript's segments
+ * touch: Whisper ends a line at 7.08s and starts the next at the same 7.08s.
+ * Rounding each line's start and duration on its own then produces clips that
+ * overlap -- 7.08s rounds to frame 213 as a duration but to 212 as a start --
+ * and `addClip` refuses an overlap, so one bad pair throws away the rest of
+ * the batch.
+ *
+ * So every timestamp is converted to frames first and each clip is then given
+ * whatever room is left before the next one begins: its last frame is the one
+ * before the next clip's first. That is a cap, never a stretch, so a gap the
+ * transcript meant to leave is still left. A line with no room at all -- two
+ * segments landing on the same frame -- is dropped rather than placed as a
+ * clip too short to read.
+ *
+ * Returns the clips actually created, in timeline order.
+ */
+export function placeTimedCaptions(
+  engine: TimelineEngine,
+  fps: number,
+  lines: ReadonlyArray<Pick<CaptionLine, "start" | "end" | "text">>,
+  offsetFrames: number,
+  style: TextStyle,
+  options?: CaptionPlacement,
+): Clip[] {
+  if (lines.length === 0) return [];
+
+  const timed = lines
+    .map((line) => ({
+      text: line.text,
+      startFrame: Math.max(0, offsetFrames + Math.round(line.start * fps)),
+      endFrame: Math.max(0, offsetFrames + Math.round(line.end * fps)),
+    }))
+    .sort((a, b) => a.startFrame - b.startFrame);
+
+  const trackId = options?.trackId ?? captionTrack(engine, options?.trackName ?? "Captions");
+  const y = options?.y ?? 0.86;
+  const placed: Clip[] = [];
+
+  engine.batch(() => {
+    for (let index = 0; index < timed.length; index += 1) {
+      const line = timed[index];
+      const nextStart = timed[index + 1]?.startFrame ?? Number.POSITIVE_INFINITY;
+      // durationFrames counts from startFrame, so ending at nextStart puts the
+      // clip's last frame at nextStart - 1: adjacent, never overlapping.
+      const durationFrames = Math.min(line.endFrame, nextStart) - line.startFrame;
+      if (durationFrames < 1) continue;
+      placed.push(
+        addCaptionClip(engine, trackId, line.text, line.startFrame, durationFrames, style, y),
+      );
+    }
+  }, "Captions");
+
+  return placed;
 }
 
 export function deleteCurrentCaptions(engine: TimelineEngine): number {

@@ -11,7 +11,7 @@ import {
   requestSilenceDetect,
   searchMusic,
 } from "./api";
-import { fetchCaptions } from "./captionActions";
+import { fetchCaptions, placeTimedCaptions } from "./captionActions";
 import { selectClip } from "./clipEdit";
 import { addAudioBlob } from "./placeMedia";
 import type { TimeRange } from "./previewLook";
@@ -190,54 +190,25 @@ async function addCaptions(op: AiEditOperation, ctx: OpContext): Promise<Applied
   }
 
   /*
-    Frame maths done here rather than per line, because the engine refuses an
-    overlap and rounding each line independently produces them: a line ending
-    at 7.08s rounds up to frame 213 while the next, starting at the same 7.08s,
-    rounds down to 212, and the pair collide by a frame. Converting both edges
-    first and then capping each clip at the next one's start makes that
-    impossible. A line left with nothing is dropped rather than squeezed to a
-    frame nobody can read.
+    placeTimedCaptions owns the frame maths -- converting every timestamp
+    before placing anything, so segments that touch cannot round into an
+    overlap the engine would refuse. What is still decided here is the track:
+    a free one, so an AI caption pass does not collide with captions the
+    Captions panel already laid down.
   */
-  const timed = lines
-    .map((line) => ({
-      start: Math.max(0, offsetFrames + Math.round(line.start * fps)),
-      end: Math.max(0, offsetFrames + Math.round(line.end * fps)),
-      text: line.text,
-    }))
-    .sort((a, b) => a.start - b.start);
+  const starts = lines.map((line) => Math.max(0, offsetFrames + Math.round(line.start * fps)));
+  const ends = lines.map((line) => Math.max(0, offsetFrames + Math.round(line.end * fps)));
+  const from = Math.min(...starts);
+  const trackId = freeElementsTrack(engine, "Captions", from, Math.max(...ends) - from);
 
-  const span = {
-    from: timed[0].start,
-    to: Math.max(...timed.map((line) => line.end)),
-  };
-  const trackId = freeElementsTrack(engine, "Captions", span.from, span.to - span.from);
-
-  const created: string[] = [];
-  engine.batch(() => {
-    for (let index = 0; index < timed.length; index += 1) {
-      const line = timed[index];
-      const nextStart = timed[index + 1]?.start ?? Number.POSITIVE_INFINITY;
-      const durationFrames = Math.min(line.end, nextStart) - line.start;
-      if (durationFrames < 1) continue;
-      const clip = engine.addClip({
-        trackId,
-        type: "text",
-        name: line.text.slice(0, 48) || "Caption",
-        startFrame: line.start,
-        durationFrames,
-        text: {
-          content: line.text,
-          fontSize: 44,
-          color: "#ffffff",
-          fontFamily: "Inter",
-          fontWeight: "bold",
-          textAlign: "center",
-        },
-        transform: { x: 0.5, y: 0.86, scale: 1, rotation: 0, anchor: { x: 0.5, y: 0.5 } },
-      });
-      created.push(clip.id);
-    }
-  });
+  const created = placeTimedCaptions(
+    engine,
+    fps,
+    lines,
+    offsetFrames,
+    { fontSize: 44, color: "#ffffff", fontFamily: "Inter", fontWeight: "bold" },
+    { trackId },
+  ).map((clip) => clip.id);
 
   if (created.length === 0) {
     throw new OpSkipped("The transcript was too tightly packed to lay out as captions.");

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTimelineEngine, type Clip, type TimelineEngine } from "@elah/editor";
 import { requestTranslate } from "../../api";
-import { placeTimedCaption } from "../../captionActions";
+import { placeTimedCaptions } from "../../captionActions";
 import { SPOKEN_LANGUAGES, TRANSLATE_LANGUAGES } from "../../library";
 import { useApiJob } from "../../useApiJob";
 import { ErrorNote, HintNote, PanelBody, PrimaryButton, QuietButton } from "../chrome";
@@ -92,19 +92,15 @@ export function TranslatePanel({ fps }: { fps: number }) {
   /** Lays the translation onto its own caption track, two seconds a line. */
   function addAsCaptions() {
     if (!lines) return;
-    engine.batch(() => {
-      lines.forEach((text, index) => {
-        placeTimedCaption(
-          engine,
-          fps,
-          { start: index * 2, end: index * 2 + 2, text },
-          0,
-          CAPTION_STYLE,
-          { trackName: "Captions 2", y: 0.74 },
-        );
-      });
-    }, "Translated captions");
-    toast(`${lines.length} captions added`);
+    const placed = placeTimedCaptions(
+      engine,
+      fps,
+      lines.map((text, index) => ({ start: index * 2, end: index * 2 + 2, text })),
+      0,
+      CAPTION_STYLE,
+      { trackName: "Captions 2", y: 0.74 },
+    );
+    toast(`${placed.length} caption${placed.length === 1 ? "" : "s"} added`);
   }
 
   return (

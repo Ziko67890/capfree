@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useTimelineEngine } from "@elah/editor";
 import type { CaptionLine } from "../../api";
 import { requestBurnSubtitles } from "../../api";
-import { fetchCaptions, placeTimedCaption, seekFrame, srtFromCaptions } from "../../captionActions";
+import {
+  fetchCaptions,
+  placeTimedCaption,
+  placeTimedCaptions,
+  seekFrame,
+  srtFromCaptions,
+} from "../../captionActions";
 import { CAPTION_FONTS } from "../../catalog";
 import { placeTextClip } from "../../clipEdit";
 import { SPOKEN_LANGUAGES } from "../../library";
@@ -108,12 +114,17 @@ export function CaptionsPanel({ fps }: { fps: number }) {
 
   function addAll() {
     if (!transcript) return;
-    engine.batch(() => {
-      for (const line of transcript.lines) {
-        placeTimedCaption(engine, fps, line, transcript.offsetFrames, style.text);
-      }
-    }, "Auto captions");
-    toast(`${transcript.lines.length} captions added to the timeline`);
+    // The batch call, not a loop of single ones: segments that touch have to
+    // be converted to frames together or they round into each other and the
+    // engine rejects the overlap.
+    const placed = placeTimedCaptions(
+      engine,
+      fps,
+      transcript.lines,
+      transcript.offsetFrames,
+      style.text,
+    );
+    toast(`${placed.length} caption${placed.length === 1 ? "" : "s"} added to the timeline`);
   }
 
   function burnCaptions() {

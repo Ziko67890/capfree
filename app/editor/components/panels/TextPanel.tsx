@@ -11,7 +11,7 @@ import {
   type TextAnimation,
   type TextAnimationKind,
 } from "@elah/editor";
-import { placeTimedCaption } from "../../captionActions";
+import { placeTimedCaptions } from "../../captionActions";
 import { CAPTION_FONTS } from "../../catalog";
 import { deleteSelection, placeTextClip, selectedClips } from "../../clipEdit";
 import { useSelectedClip } from "../../useSelectedClip";
@@ -182,8 +182,10 @@ export function TextPanel({ fps }: TextPanelProps) {
         toast("No captions found in that file.", "error");
         return;
       }
-      for (const line of lines) placeTimedCaption(engine, fps, line, 0, style);
-      toast(`Added ${lines.length} captions`);
+      // An imported SRT has the same touching timestamps a transcript does,
+      // so the whole file is placed in one call and capped line by line.
+      const placed = placeTimedCaptions(engine, fps, lines, 0, style);
+      toast(`Added ${placed.length} caption${placed.length === 1 ? "" : "s"}`);
     };
     reader.onerror = () => toast("Could not read that subtitle file.", "error");
     reader.readAsText(file);
