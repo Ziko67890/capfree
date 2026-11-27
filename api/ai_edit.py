@@ -23,6 +23,12 @@ from pydantic import BaseModel, Field
 
 router = APIRouter()
 
+# What one operation adds to the reported cost, unless its rule names a figure
+# of its own. No model runs here, so this is the size of the exchange rather
+# than a bill -- reported in the same unit as the model-backed prompt bar so
+# the two can be added up in one place later.
+DEFAULT_OP_TOKENS = 20
+
 
 class AiEditRequest(BaseModel):
     prompt: str = Field(default="", max_length=2000)
@@ -60,6 +66,34 @@ RULES: List[Dict[str, Any]] = [
             "style": "hook",
         },
         "phrase": "a hook title over the first three seconds",
+    },
+    {
+        # Deliberately wide: an outro is asked for in more ways than anything
+        # else here, and most of the phrasings are the outro's own script
+        # ("smash the like", "see you next time") rather than a description of
+        # the edit. Matching on whole words keeps the loosest of them --
+        # "thanks", "follow", "share this" -- from firing inside other words.
+        "name": "add_outro",
+        "words": [
+            "thanks", "outro", "thanks for watching", "follow", "subscribe",
+            "end card", "end screen", "see you next", "see you in the next",
+            "that's all", "thats all", "wrap up", "wrap it up", "till next time",
+            "until next time", "smash the like", "hit the like", "drop a like",
+            "comment below", "share this", "don't forget to", "if you enjoyed",
+            "peace out", "that's a wrap", "thats a wrap", "catch you later",
+            "stay tuned", "notification bell", "turn on notifications",
+            "new video every", "upload every",
+        ],
+        "operation": {
+            "op": "add_outro",
+            "text1": "Thanks for Watching! 🙏",
+            "text2": "Like & Subscribe for more",
+            "duration": 3,
+        },
+        "phrase": "a three-second end card after the last clip",
+        # The card is drawn in the browser from fixed strings, so this one
+        # really is the cheapest thing the endpoint can ask for.
+        "tokens": 1,
     },
     {
         "name": "add_captions",
@@ -159,6 +193,8 @@ def ai_edit(request: AiEditRequest, x_api_key: Optional[str] = Header(None)):
 
     operations: List[Dict[str, Any]] = []
     phrases: List[str] = []
+    # Most operations cost the same; a rule may say otherwise.
+    costs: List[int] = []
     suppressed: set = set()
 
     for rule in RULES:
@@ -169,20 +205,22 @@ def ai_edit(request: AiEditRequest, x_api_key: Optional[str] = Header(None)):
         suppressed.update(rule.get("suppresses", []))
         operations.append(dict(rule["operation"]))
         phrases.append(rule["phrase"])
+        costs.append(int(rule.get("tokens", DEFAULT_OP_TOKENS)))
 
     # An audio-only selection has no picture: a grade, a zoom or a hook over it
     # would be an operation the editor could not carry out. Dropping them here
     # keeps the browser from having to second-guess the answer.
     if request.clip_type == "audio":
-        visual = {"add_text", "color_grade", "zoom_pan"}
+        visual = {"add_text", "add_outro", "color_grade", "zoom_pan"}
         kept = [
-            (op, phrase)
-            for op, phrase in zip(operations, phrases)
+            (op, phrase, cost)
+            for op, phrase, cost in zip(operations, phrases, costs)
             if op["op"] not in visual
         ]
         dropped = len(operations) - len(kept)
-        operations = [op for op, _ in kept]
-        phrases = [phrase for _, phrase in kept]
+        operations = [op for op, _, _ in kept]
+        phrases = [phrase for _, phrase, _ in kept]
+        costs = [cost for _, _, cost in kept]
         if dropped and not operations:
             return {
                 "operations": [],
@@ -204,10 +242,8 @@ def ai_edit(request: AiEditRequest, x_api_key: Optional[str] = Header(None)):
     if not operations:
         return {"operations": [], "description": FALLBACK, "cost_tokens": 0}
 
-    # No model ran, so this is not a bill -- it is the size of the exchange, in
-    # the same unit the model-backed prompt bar reports, so the two can be
-    # added up in one place later.
-    cost_tokens = len(prompt) // 4 + 20 * len(operations)
+    # The prompt itself, plus whatever each matched rule charges.
+    cost_tokens = len(prompt) // 4 + sum(costs)
 
     return {
         "operations": operations,

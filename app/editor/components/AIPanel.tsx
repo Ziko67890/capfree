@@ -21,14 +21,19 @@ type Message =
 /** The daily allowance. Hardcoded until there is an account to count against. */
 const FREE_EDITS_PER_DAY = 5;
 
-const QUICK_PROMPTS = [
+/**
+ * `label` is what the button says; `prompt` is what goes in the box, which is
+ * only spelled out where the two differ -- the endpoint matches on keywords,
+ * and "Add outro" alone does not contain any of them.
+ */
+const QUICK_PROMPTS: { icon: string; label: string; prompt?: string }[] = [
   { icon: "✂️", label: "Remove silences" },
   { icon: "🎵", label: "Add chill music" },
-  { icon: "⚡", label: "Speed ramp end" },
+  { icon: "🙏", label: "Add outro", prompt: "add thanks for watching outro" },
   { icon: "🎨", label: "Cinematic color" },
   { icon: "📝", label: "Add hook text" },
   { icon: "🔤", label: "Auto captions" },
-] as const;
+];
 
 const TYPE_BADGE: Record<string, { label: string; className: string; thumb: string }> = {
   video: { label: "VIDEO", className: "bg-[rgba(91,94,244,0.15)] text-[#7b7ef8]", thumb: "🎥" },
@@ -339,7 +344,7 @@ export function AIPanel({ fps }: AIPanelProps) {
               key={quick.label}
               type="button"
               disabled={busy}
-              onClick={() => fillPrompt(quick.label)}
+              onClick={() => fillPrompt(quick.prompt ?? quick.label)}
               className="rounded-[7px] border border-[var(--border)] bg-[var(--bg-panel2)] px-2.5 py-1.5 text-left text-[11.5px] leading-tight text-[var(--text-muted)] transition-colors hover:border-[var(--accent)] hover:bg-[rgba(91,94,244,0.15)] hover:text-white disabled:opacity-40"
             >
               <span className="mr-1">{quick.icon}</span>

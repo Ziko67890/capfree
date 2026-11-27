@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  importBlob,
+  insertMediaAsset,
   playbackStore,
   type Clip,
   type TimelineEngine,
@@ -373,8 +375,8 @@ function speedRamp(op: AiEditOperation, ctx: OpContext): AppliedEdit {
   };
 }
 
-// A slow push rather than a jump, so it reads as camera movement. The
-// animation lives in globals.css under .capfree-kenburns.
+// The suffix of the class EditorShell puts on the stage: `ken_burns` becomes
+// `capfree-motion-kenburns`. The keyframes live in globals.css.
 const MOTIONS: Record<string, string> = {
   ken_burns: "kenburns",
   push_in: "pushin",
@@ -387,13 +389,98 @@ function zoomPan(op: AiEditOperation, ctx: OpContext): AppliedEdit {
 
   const wasName = look.activeMotion;
   const wasCss = look.motionCss;
-  look.setMotion(style, motion);
 
+  /*
+    Asking for the same move twice turns it off. Without that there is no way
+    back from a prompt except the chip, and a second "zoom" reads as "stop
+    doing that" far more often than it reads as "do it again".
+  */
+  const already = look.motionCss === motion;
+  if (already) look.setMotion(null, "");
+  else look.setMotion(style, motion);
+
+  const name = style === "ken_burns" ? "Ken Burns push" : "Zoom";
   return {
     id: nextId(),
     tone: "blue",
-    label: style === "ken_burns" ? "Ken Burns push on the preview" : "Zoom on the preview",
+    label: already ? `${name} turned off` : `${name} on the preview`,
     undo: () => look.setMotion(wasName, wasCss),
+  };
+}
+
+/**
+ * The end card: 1920x1080 of black with three lines on it, drawn here and
+ * imported as an image clip.
+ *
+ * Drawn rather than composed from text clips because an end card is one
+ * thing, not three: a single clip can be dragged, trimmed and deleted as a
+ * unit, where three stacked text clips have to be kept in step by hand. The
+ * canvas is the project's own frame size, so it lands pixel-for-pixel.
+ */
+async function addOutro(op: AiEditOperation, ctx: OpContext): Promise<AppliedEdit> {
+  const { engine, fps } = ctx;
+  const seconds = op.duration ?? 3;
+  const line1 = op.text1 ?? "Thanks for Watching! 🙏";
+  const line2 = op.text2 ?? "Like & Subscribe for more";
+  const line3 = "🔔 Turn on notifications";
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1920;
+  canvas.height = 1080;
+  const context = canvas.getContext("2d");
+  if (!context) throw new OpSkipped("This browser would not give up a 2D canvas.");
+
+  context.fillStyle = "#000000";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.textAlign = "center";
+  context.textBaseline = "alphabetic";
+
+  const centerX = canvas.width / 2;
+  context.fillStyle = "#ffffff";
+  context.font = "bold 96px sans-serif";
+  context.fillText(line1, centerX, 460);
+  context.fillStyle = "#5b5ef4";
+  context.font = "56px sans-serif";
+  context.fillText(line2, centerX, 580);
+  context.fillStyle = "#888888";
+  context.font = "44px sans-serif";
+  context.fillText(line3, centerX, 660);
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/png");
+  });
+  if (!blob) throw new OpSkipped("The end card could not be rendered.");
+
+  // After everything, not after the playhead: an outro that lands mid-timeline
+  // is not an outro. The main video track decides where the end is, falling
+  // back to the whole project when there is no video on it yet.
+  const project = engine.getProject();
+  const mainVideo = project.tracks.find((track) => track.kind === "video");
+  const lastClipEnd = mainVideo
+    ? engine
+        .getClipsOnTrack(mainVideo.id)
+        .reduce((end, clip) => Math.max(end, clip.startFrame + clip.durationFrames), 0)
+    : 0;
+  const startFrame = Math.max(lastClipEnd, engine.getTotalFrames());
+  const durationFrames = Math.max(1, Math.round(seconds * fps));
+
+  const asset = await importBlob(new File([blob], "outro.png", { type: "image/png" }), {
+    name: "Outro",
+    kind: "image",
+  });
+  const result = await insertMediaAsset(engine, asset.id, { desiredStartFrame: startFrame });
+  if (!result.ok || result.clipIds.length === 0) {
+    throw new OpSkipped("Could not place the end card on the timeline.");
+  }
+  const clipId = result.clipIds[0];
+  engine.updateClip(clipId, result.trackId, { name: "Outro", durationFrames });
+  selectClip(clipId);
+
+  return {
+    id: nextId(),
+    tone: "green",
+    label: `Outro card — ${seconds}s from ${timecode(startFrame / fps)}`,
+    undo: () => removeClips(engine, [clipId]),
   };
 }
 
@@ -425,6 +512,8 @@ export async function applyOperation(
       return speedRamp(op, ctx);
     case "zoom_pan":
       return zoomPan(op, ctx);
+    case "add_outro":
+      return addOutro(op, ctx);
     default:
       throw new OpSkipped(`"${String(op.op)}" is not an edit this editor knows.`);
   }
@@ -440,4 +529,5 @@ export const OP_STATUS: Record<AiEditOperation["op"], string> = {
   color_grade: "Grading the preview…",
   speed_ramp: "Changing the speed…",
   zoom_pan: "Adding the push…",
+  add_outro: "Drawing the end card…",
 };

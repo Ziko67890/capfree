@@ -710,7 +710,8 @@ export interface AiEditOperation {
     | "audio_duck"
     | "color_grade"
     | "speed_ramp"
-    | "zoom_pan";
+    | "zoom_pan"
+    | "add_outro";
   text?: string;
   start?: number;
   end?: number;
@@ -726,6 +727,10 @@ export interface AiEditOperation {
   start_speed?: number;
   end_speed?: number;
   at?: string;
+  /** add_outro: the two lines on the end card, and how long it holds. */
+  text1?: string;
+  text2?: string;
+  duration?: number;
 }
 
 export interface AiEditResponse {

@@ -555,17 +555,27 @@ html[data-theme="dark"] .capfree-landing {
 /* ---------------------------------------------------------------------------
    Preview motion.
 
-   A slow push rather than a jump, so it reads as a camera move. The stage
-   clips its own overflow, so scaling past 1 crops rather than spilling, which
-   is what a Ken Burns is. `transform-origin` is what makes the two differ:
-   the drift comes from moving the origin, not from animating a translate.
+   The class goes on .capfree-stage, which EditorShell composes from the look
+   state; the animation runs on the canvas inside it. That split is the point:
+   the stage is the sheet of media sitting on the grey surround, with its own
+   rounded corners and drop shadow, and scaling the sheet would push it out
+   past its margin. Scaling the picture inside a fixed, overflow-hidden frame
+   is what a Ken Burns actually is -- the frame holds still and the image
+   drifts and crops behind it.
+
+   Timing is load-bearing and was the bug. At 12s ease-in-out the first two
+   seconds are motionless -- measured at scale 1.007 after 2.03s, seven pixels
+   of travel across three seconds -- because ease-in-out parks at both ends of
+   an alternating loop, which is exactly where a viewer looks. Linear over 8s
+   is always moving, so the drift reads as camera movement rather than as a
+   still frame.
    --------------------------------------------------------------------------- */
 @keyframes capfree-kenburns {
   from {
     transform: scale(1) translate(0, 0);
   }
   to {
-    transform: scale(1.12) translate(-2%, 1.5%);
+    transform: scale(1.08) translate(-2%, -2%);
   }
 }
 
@@ -579,12 +589,14 @@ html[data-theme="dark"] .capfree-landing {
 }
 
 .capfree-motion-kenburns canvas {
-  animation: capfree-kenburns 12s ease-in-out infinite alternate;
+  animation: capfree-kenburns 8s linear infinite alternate;
+  transform-origin: center center;
   will-change: transform;
 }
 
 .capfree-motion-pushin canvas {
-  animation: capfree-pushin 8s ease-in-out infinite alternate;
+  animation: capfree-pushin 8s linear infinite alternate;
+  transform-origin: center center;
   will-change: transform;
 }
 
