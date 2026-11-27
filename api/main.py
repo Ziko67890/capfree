@@ -27,6 +27,7 @@ from media import router as media_router
 from music import router as music_router
 from removebg import router as removebg_router
 from silence import router as silence_router
+from social_upload import router as social_router
 from tracking import router as tracking_router
 from tts import router as tts_router
 from translate import router as translate_router
@@ -49,6 +50,7 @@ app.add_middleware(
 )
 
 app.include_router(silence_router)
+app.include_router(social_router)
 app.include_router(fillers_router)
 app.include_router(music_router)
 app.include_router(media_router)

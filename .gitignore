@@ -43,3 +43,12 @@ next-env.d.ts
 # electron desktop build
 /dist/
 /out-desktop/
+
+# OAuth tokens for YouTube / TikTok / Instagram. Live account access —
+# never commit this, and never add an exception for it.
+api/tokens.json
+api/tokens.json.tmp
+
+# .env itself stays ignored; the template of key names carries no values and
+# is the only way anyone knows which keys exist.
+!.env.example

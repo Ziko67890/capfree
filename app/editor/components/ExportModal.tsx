@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Download, Folder, Check } from "lucide-react";
+import { X, Download, Folder, Check, Share2 } from "lucide-react";
 import { exportVideo, useMediaLibrary, useTimelineEngine } from "@elah/editor";
 import {
   fetchExportFolder,
@@ -11,6 +11,7 @@ import {
   type ExportResolution,
 } from "../api";
 import { Spinner } from "./chrome";
+import { ShareModal, type ShareTarget } from "./ShareModal";
 import { useToast } from "./toast";
 
 interface ExportModalProps {
@@ -165,6 +166,10 @@ export function ExportModal({ onClose }: ExportModalProps) {
   const [editingFolder, setEditingFolder] = useState(false);
   const [savedPath, setSavedPath] = useState("");
   const [note, setNote] = useState("");
+  // Filled from the API's own reading of the finished file, so the share
+  // dialog validates against what is on disk rather than what was requested.
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
+  const [showShare, setShowShare] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -260,6 +265,7 @@ export function ExportModal({ onClose }: ExportModalProps) {
     setErrorMsg("");
     setSavedPath("");
     setNote("");
+    setShareTarget(null);
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -316,6 +322,14 @@ export function ExportModal({ onClose }: ExportModalProps) {
           folder: folder || undefined,
         });
         setSavedPath(saved.path);
+        setShareTarget({
+          filePath: saved.path,
+          filename: saved.filename,
+          width: saved.width,
+          height: saved.height,
+          durationSeconds: saved.duration,
+          bytes: saved.bytes,
+        });
         // Read back off the file, so a transcode that did not happen cannot
         // be reported as though it had.
         if (saved.transcoded && saved.width && saved.height) {
@@ -608,6 +622,19 @@ export function ExportModal({ onClose }: ExportModalProps) {
               </button>
             )}
 
+            {/* Only once the API has the file: sharing needs a path the API
+                can read, which a browser-side download does not give it. */}
+            {settled && shareTarget && (
+              <button
+                type="button"
+                onClick={() => setShowShare(true)}
+                className="flex items-center gap-2 rounded-lg border border-[var(--accent)] px-3.5 py-2 text-[13px] font-semibold text-[var(--accent)] transition-colors hover:bg-[rgba(91,94,244,0.12)]"
+              >
+                <Share2 className="h-4 w-4" />
+                Share
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleExport}
@@ -638,6 +665,10 @@ export function ExportModal({ onClose }: ExportModalProps) {
           </div>
         </div>
       </div>
+
+      {showShare && shareTarget && (
+        <ShareModal target={shareTarget} onClose={() => setShowShare(false)} />
+      )}
     </div>
   );
 }

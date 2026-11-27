@@ -387,6 +387,78 @@ export async function requestBurnSubtitles(
   return response.blob();
 }
 
+export type SocialPlatform = "youtube" | "tiktok" | "instagram";
+
+export interface AuthStatus {
+  connected: Record<SocialPlatform, boolean>;
+  /** False when the API has no app credentials for that platform at all. */
+  configured: Record<SocialPlatform, boolean>;
+  /** The channel or handle that was connected, when the platform named one. */
+  accounts: Record<SocialPlatform, string>;
+}
+
+export interface UploadResult {
+  platform: string;
+  id: string;
+  url?: string;
+  status?: string;
+  privacy?: string;
+}
+
+/** Which social accounts are connected, and which the API could connect. */
+export async function fetchAuthStatus(): Promise<AuthStatus> {
+  const data = (await getJson("/auth/status", {})) as Record<string, unknown>;
+  const flags = (key: string, fallback: boolean) => {
+    const source = (data[key] ?? {}) as Record<string, unknown>;
+    return {
+      youtube: Boolean(source.youtube ?? fallback),
+      tiktok: Boolean(source.tiktok ?? fallback),
+      instagram: Boolean(source.instagram ?? fallback),
+    };
+  };
+  const names = (data.accounts ?? {}) as Record<string, string>;
+  return {
+    connected: {
+      youtube: Boolean(data.youtube),
+      tiktok: Boolean(data.tiktok),
+      instagram: Boolean(data.instagram),
+    },
+    configured: flags("configured", false),
+    accounts: {
+      youtube: names.youtube ?? "",
+      tiktok: names.tiktok ?? "",
+      instagram: names.instagram ?? "",
+    },
+  };
+}
+
+/** Where the browser should send the user to authorise one platform. */
+export function oauthStartUrl(platform: SocialPlatform): string {
+  return `${API_URL}/oauth/${platform}/start`;
+}
+
+/**
+ * Posts a finished export to one platform. The API holds the tokens and does
+ * the talking; what travels from here is the path it already knows about.
+ */
+export async function uploadToPlatform(
+  platform: SocialPlatform,
+  body: Record<string, unknown>,
+): Promise<UploadResult> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/upload/${platform}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(UNREACHABLE);
+  }
+  if (!response.ok) throw new ApiError(await readError(response));
+  return (await response.json()) as UploadResult;
+}
+
 /**
  * Where the API would save an export, so the dialog can show the path before
  * there is a file to put there.

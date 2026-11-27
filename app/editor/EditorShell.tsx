@@ -38,6 +38,7 @@ import { consumeSticker } from "./stickerDrag";
 import { playheadFrame, seekFrame } from "./captionActions";
 import { useSelectedClip } from "./useSelectedClip";
 import { useAutoSave } from "./useAutoSave";
+import { useImageRedraw } from "./useImageRedraw";
 import { usePlayheadFollow } from "./usePlayheadFollow";
 import { useShortcuts } from "./useShortcuts";
 import { RestoreBanner } from "./components/RestoreBanner";
@@ -94,6 +95,7 @@ function EditorInner() {
 
   useAutoSave(pending === null);
   usePlayheadFollow(TIMELINE_SIDEBAR_WIDTH);
+  useImageRedraw(previewRef);
   useShortcuts(FPS);
 
   // Force Preview's ResizeObserver to fire after layout is fully painted.
