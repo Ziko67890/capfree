@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 /** Shared input shape: full width, 36px tall. */
 export const fieldClass =
-  "h-9 w-full rounded-md border border-[#3a3a40] bg-[#1a1a1e] px-2.5 text-[12px] text-white outline-none focus:border-[#ffffff]";
+  "h-9 w-full rounded-[6px] border border-[var(--border)] bg-[var(--bg-panel2)] px-2.5 text-[12px] normal-case tracking-normal text-white outline-none focus:border-[var(--accent)]";
 
 export function PanelFrame({
   title,

@@ -92,10 +92,10 @@ export function TimelineBar({ fps }: TimelineBarProps) {
   }
 
   const buttonClass =
-    "flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-[#c8c8ce] transition-colors duration-150 hover:bg-[#1a1a1e] hover:text-white disabled:opacity-40";
+    "flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--bg-panel)] hover:text-white disabled:opacity-40";
 
   return (
-    <div className="relative flex h-9 shrink-0 items-center border-b border-[#34343a] bg-[#2a2a2e] px-2">
+    <div className="relative flex h-9 shrink-0 items-center border-b border-[var(--border)] bg-[var(--bg-panel2)] px-2">
       <div className="flex items-center gap-0.5">
         <button type="button" className={buttonClass} onClick={split}>
           <Scissors className="h-3.5 w-3.5" />
@@ -191,9 +191,9 @@ export function TimelineBar({ fps }: TimelineBarProps) {
       )}
 
       {open && (
-        <div className="absolute bottom-full left-2 z-20 mb-1 w-56 rounded-md border border-[#3a3a40] bg-[#2a2a2e] p-3 shadow-lg">
+        <div className="absolute bottom-full left-2 z-20 mb-1 w-56 rounded-lg border border-[var(--border)] bg-[var(--bg-panel2)] p-3 shadow-lg">
           {open === "speed" ? (
-            <label className="flex flex-col gap-1 text-[11px] text-[#c8c8ce]">
+            <label className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)]">
               <span className="flex justify-between">
                 Speed <span className="font-mono">{speed.toFixed(2)}x</span>
               </span>
@@ -216,11 +216,11 @@ export function TimelineBar({ fps }: TimelineBarProps) {
                   for (const hit of videos) engine.setClipSpeed(hit.clip.id, hit.trackId, next);
                   report(null);
                 }}
-                className="w-full accent-[#ffffff]"
+                className="w-full accent-[var(--accent)]"
               />
             </label>
           ) : (
-            <label className="flex flex-col gap-1 text-[11px] text-[#c8c8ce]">
+            <label className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)]">
               <span className="flex justify-between">
                 Volume <span className="font-mono">{volume}%</span>
               </span>
@@ -237,7 +237,7 @@ export function TimelineBar({ fps }: TimelineBarProps) {
                   previewVolume(next);
                 }}
                 onPointerUp={() => engine.commitInteraction("Volume")}
-                className="w-full accent-[#ffffff]"
+                className="w-full accent-[var(--accent)]"
               />
             </label>
           )}

@@ -73,7 +73,7 @@ interface ToolBarProps {
 
 export function ToolBar({ tab, onTab }: ToolBarProps) {
   return (
-    <div className="capfree-scroll flex h-[76px] shrink-0 items-stretch gap-2 overflow-x-auto border-b border-[#2a2a30] bg-[#111114] px-2">
+    <div className="capfree-scroll flex h-14 shrink-0 items-stretch gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg-app)] px-2">
       {TABS.map((item) => {
         const Icon = item.icon;
         const active = tab === item.id;
@@ -82,18 +82,26 @@ export function ToolBar({ tab, onTab }: ToolBarProps) {
             key={item.id}
             type="button"
             onClick={() => onTab(item.id)}
-            className={`flex w-[80px] shrink-0 flex-col items-center justify-center gap-1 border-b-2 px-1 transition-colors duration-150 ${
-              active ? "border-[#ffffff] text-white" : "border-transparent text-[#8f8f97] hover:text-white"
+            className={`relative flex w-[72px] shrink-0 flex-col items-center justify-center gap-1 border-b-2 px-1 transition-colors duration-150 ${
+              active
+                ? "border-[var(--accent)] text-white"
+                : "border-transparent text-[var(--text-muted)] hover:text-white"
             }`}
           >
             <Icon className="h-[18px] w-[18px]" />
             <span className="text-[11px] leading-none">{item.label}</span>
-            {item.exclusive ? (
-              <span className="mt-0.5 rounded-[6px] bg-[#ffffff] px-1.5 py-px text-[8px] font-semibold leading-none text-black">
-                ✦ Exclusive
-              </span>
-            ) : (
-              <span className="mt-0.5 h-[12px]" aria-hidden />
+            {/*
+              The premium tabs used to carry a "✦ Exclusive" pill, which no
+              longer fits in 56px and put its words into the button's
+              accessible name. A dot in the accent keeps the signal at a
+              glance; the title says what it means for anyone hovering.
+            */}
+            {item.exclusive && (
+              <span
+                aria-hidden
+                title="Exclusive"
+                className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-[var(--accent)]"
+              />
             )}
           </button>
         );

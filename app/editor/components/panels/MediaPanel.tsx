@@ -75,6 +75,10 @@ export function MediaPanel({ onAssetActivate }: MediaPanelProps) {
             dropzone: "min-h-0 capfree-media-drop",
             thumb: "capfree-media-thumb",
             cardTitle: "capfree-media-title",
+            // "+ URL" and "+ Add": the panel's own ingest buttons, given the
+            // same dark-on-bordered treatment as the rest of the chrome.
+            ingestButton:
+              "rounded-md border border-[var(--border)] bg-[var(--bg-panel2)] px-2 py-1 text-[11px] text-white transition-colors hover:border-[var(--accent)]",
           }}
           activateOnTap
           onAssetActivate={onAssetActivate}

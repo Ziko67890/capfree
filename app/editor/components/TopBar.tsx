@@ -18,21 +18,24 @@ export function TopBar({ onExport, onSettings }: TopBarProps) {
   const canRedo = useTracksStore((state) => state.canRedo);
 
   const iconButtonClass =
-    "w-8 h-8 flex items-center justify-center rounded-md text-[#888] hover:text-white hover:bg-[#222] transition-colors disabled:pointer-events-none disabled:opacity-40";
+    "w-8 h-8 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-panel2)] transition-colors disabled:pointer-events-none disabled:opacity-40";
 
   return (
-    <header className="flex items-center h-12 px-4 border-b border-[#222] bg-[#111113] flex-shrink-0 gap-4">
-      {/* Logo */}
-      <Link href="/" className="flex items-center gap-1.5 flex-shrink-0">
-        <div className="w-7 h-7 rounded-md bg-[#ffffff] flex items-center justify-center">
-          <Scissors className="w-4 h-4 text-black" />
-        </div>
-        <span className="text-sm font-bold tracking-tight text-white hidden sm:inline">CapFree</span>
+    <header className="flex h-12 flex-shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--bg-app)] px-4">
+      {/* Logo — the mark is the icon itself now, not a white tile around it */}
+      <Link href="/" className="flex flex-shrink-0 items-center gap-2">
+        <Scissors className="h-[18px] w-[18px] text-white" />
+        {/* Always shown: the window cannot go below 1024px, so the breakpoint
+            this used to hide behind only ever hid the name. */}
+        <span className="text-[15px] font-bold tracking-tight">
+          <span className="text-white">Cap</span>
+          <span className="text-[var(--accent)]">Free</span>
+        </span>
       </Link>
 
       {/* Project name */}
-      <div className="flex-1 min-w-0 flex items-center justify-center">
-        <span className="text-sm text-[#888] truncate">Untitled Project</span>
+      <div className="flex min-w-0 flex-1 items-center justify-center">
+        <span className="truncate text-[13px] text-[var(--text-muted)]">Untitled Project</span>
       </div>
 
       {/* Actions */}
@@ -58,19 +61,15 @@ export function TopBar({ onExport, onSettings }: TopBarProps) {
           <Redo2 className="w-4 h-4" />
         </button>
 
-        <button
-          onClick={onSettings}
-          aria-label="Settings"
-          className="w-8 h-8 flex items-center justify-center rounded-md text-[#888] hover:text-white hover:bg-[#222] transition-colors"
-        >
+        <button onClick={onSettings} aria-label="Settings" className={iconButtonClass}>
           <Settings className="w-4 h-4" />
         </button>
 
         <button
           onClick={onExport}
-          className="flex items-center gap-1.5 px-3 h-8 rounded-md bg-[#ffffff] text-black text-sm font-semibold hover:bg-[#e6e6e6] transition-colors"
+          className="ml-1 flex h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-[13px] font-semibold text-black transition-colors hover:bg-[#e6e6e6]"
         >
-          <Download className="w-3.5 h-3.5" />
+          <Download className="h-3.5 w-3.5" />
           Export
         </button>
       </div>

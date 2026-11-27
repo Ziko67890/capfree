@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import {
   Eraser,
   FlipHorizontal2,
@@ -69,6 +69,13 @@ const CLIP_TABS = ["Basic", "Speed", "Transform"] as const;
 /** Longer fades than this belong on the timeline, not in a sidebar slider. */
 const MAX_FADE_SEC = 5;
 
+/** 11px, uppercase, muted: the one field-label treatment the panel uses. */
+const FIELD_LABEL = "text-[11px] uppercase tracking-[0.03em] text-[var(--text-muted)]";
+
+/** The paired Crop / Resize buttons under Transform. */
+const TRANSFORM_BUTTON =
+  "flex-1 rounded-[7px] border border-[var(--border)] bg-[var(--bg-panel2)] py-2 text-[12px] text-white transition-colors duration-150 hover:border-[var(--accent)] disabled:opacity-40";
+
 function SliderRow({
   label,
   min,
@@ -91,10 +98,10 @@ function SliderRow({
   onCommit: (value: number) => void;
 }) {
   return (
-    <label className={`flex flex-col gap-1 text-[11px] text-[#c8c8ce] ${disabled ? "opacity-40" : ""}`}>
+    <label className={`flex flex-col gap-1.5 ${disabled ? "opacity-40" : ""}`}>
       <span className="flex items-center justify-between">
-        {label}
-        <span className="font-mono text-[#9a9aa2]">{display}</span>
+        <span className={FIELD_LABEL}>{label}</span>
+        <span className="font-mono text-[11px] text-white">{display}</span>
       </span>
       <input
         type="range"
@@ -107,13 +114,23 @@ function SliderRow({
         onChange={(event) => onChange(Number(event.target.value))}
         onPointerUp={(event) => onCommit(Number(event.currentTarget.value))}
         onBlur={(event) => onCommit(Number(event.currentTarget.value))}
-        className="w-full accent-[#ffffff]"
+        /* The fill left of the thumb is the one thing a range input will not
+           expose, so its width is handed to the stylesheet as a percentage. */
+        style={{ "--fill": `${((value - min) / Math.max(max - min, 1e-9)) * 100}%` } as CSSProperties}
+        className="w-full"
       />
     </label>
   );
 }
 
-export function InspectorPanel({ fps }: { fps: number }) {
+export function InspectorPanel({
+  fps,
+  onOpenReframe,
+}: {
+  fps: number;
+  /** Opens the Reframe tab, which is where cropping actually happens. */
+  onOpenReframe?: () => void;
+}) {
   const engine = useTimelineEngine();
   const selected = useSelectedClip();
   const [speedInput, setSpeedInput] = useState<string | null>(null);
@@ -128,7 +145,7 @@ export function InspectorPanel({ fps }: { fps: number }) {
   }
 
   return (
-    <aside className="capfree-scroll h-full w-[280px] shrink-0 overflow-y-auto border-l border-[#2a2a30] bg-[#111114]">
+    <aside className="capfree-inspector capfree-scroll h-full w-[280px] shrink-0 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg-panel)]">
       <div className="px-3 py-3">
         <h2 className="text-[13px] font-semibold text-white">Inspector</h2>
         {!selected ? (
@@ -144,6 +161,7 @@ export function InspectorPanel({ fps }: { fps: number }) {
             clipId={selected.clip.id}
             trackId={selected.trackId}
             engine={engine}
+            onOpenReframe={onOpenReframe}
           />
         )}
       </div>
@@ -158,6 +176,7 @@ function InspectorFields({
   onSpeedInput,
   engine,
   fps,
+  onOpenReframe,
 }: {
   clipId: string;
   trackId: string;
@@ -165,6 +184,7 @@ function InspectorFields({
   onSpeedInput: (value: string | null) => void;
   engine: ReturnType<typeof useTimelineEngine>;
   fps: number;
+  onOpenReframe?: () => void;
 }) {
   const toast = useToast();
   const look = usePreviewLook();
@@ -425,8 +445,8 @@ function InspectorFields({
 
   return (
     <div className="mt-3 flex flex-col gap-3">
-      <label className="text-[12px] font-semibold text-[#c8c8ce]">
-        {isText ? "Text" : "Name"}
+      <label className="flex flex-col gap-1.5">
+        <span className={FIELD_LABEL}>{isText ? "Text" : "Name"}</span>
         <input
           value={name}
           aria-label={isText ? "Text content" : "Clip name"}
@@ -453,8 +473,8 @@ function InspectorFields({
 
       {onTransform && (
       <div className="grid grid-cols-2 gap-2">
-        <label className="text-[12px] font-semibold text-[#c8c8ce]">
-          X
+        <label className="flex flex-col gap-1.5">
+          <span className={FIELD_LABEL}>X</span>
           <input
             type="number"
             min={0}
@@ -466,8 +486,8 @@ function InspectorFields({
             className={`${fieldClass} mt-1`}
           />
         </label>
-        <label className="text-[12px] font-semibold text-[#c8c8ce]">
-          Y
+        <label className="flex flex-col gap-1.5">
+          <span className={FIELD_LABEL}>Y</span>
           <input
             type="number"
             min={0}
@@ -799,7 +819,43 @@ function InspectorFields({
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-2 text-[11px] text-[#888899]">
+      {clip.type === "video" && (
+        <div className="flex flex-col gap-1.5 border-t border-[var(--border)] pt-3">
+          <span className={FIELD_LABEL}>Transform</span>
+          <div className="flex gap-2">
+            {/*
+              Neither button can drive the preview's own crop/resize mode --
+              that is local state inside the SDK's overlay, with nothing
+              exposed to set it -- so each opens the control the editor
+              already has: Reframe for cropping, this panel's own Scale
+              slider for resizing.
+            */}
+            <button
+              type="button"
+              onClick={() => onOpenReframe?.()}
+              disabled={!onOpenReframe}
+              className={TRANSFORM_BUTTON}
+            >
+              Crop
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const scale = document.querySelector<HTMLInputElement>(
+                  '.capfree-inspector input[aria-label="Scale"]',
+                );
+                scale?.scrollIntoView({ block: "center", behavior: "smooth" });
+                scale?.focus();
+              }}
+              className={TRANSFORM_BUTTON}
+            >
+              Resize
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--text-muted)]">
         <p>Start <span className="font-mono text-white">{framesToTimecode(clip.startFrame, fps)}</span></p>
         <p>End <span className="font-mono text-white">{framesToTimecode(clip.startFrame + clip.durationFrames, fps)}</span></p>
       </div>

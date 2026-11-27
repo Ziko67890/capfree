@@ -115,14 +115,16 @@ export function SubTabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto px-2 pt-2">
+    <div className="flex gap-3 overflow-x-auto border-b border-[var(--border)] px-3">
       {tabs.map((tab) => (
         <button
           key={tab}
           type="button"
           onClick={() => onChange(tab)}
-          className={`shrink-0 rounded-full px-2 py-1 text-[11px] transition-colors duration-150 ${
-            tab === value ? "bg-[#2a2a30] text-white" : "text-[#888899] hover:text-white"
+          className={`shrink-0 border-b-2 pb-1.5 pt-2 text-[11px] transition-colors duration-150 ${
+            tab === value
+              ? "border-[var(--accent)] text-white"
+              : "border-transparent text-[var(--text-muted)] hover:text-white"
           }`}
         >
           {tab}
