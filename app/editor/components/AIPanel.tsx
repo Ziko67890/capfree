@@ -113,6 +113,9 @@ export function AIPanel({ fps }: AIPanelProps) {
   const clipSeconds = selected
     ? framesToSeconds(selected.durationFrames, fps)
     : framesToSeconds(tracks.totalFrames, fps);
+  // Read off the tracks store rather than the engine, so the strip follows
+  // the timeline as clips come and go instead of freezing at mount.
+  const clipCount = Object.values(tracks.clips).reduce((total, list) => total + list.length, 0);
 
   // Keep the newest turn in view, the way a chat does.
   useEffect(() => {
@@ -222,23 +225,44 @@ export function AIPanel({ fps }: AIPanelProps) {
         </div>
       </div>
 
-      {/* Active clip context */}
-      <div className="mx-3.5 mt-3 flex shrink-0 items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--bg-panel2)] px-3 py-2.5">
-        <span className="flex h-7 w-11 shrink-0 items-center justify-center rounded-[5px] bg-[#2a2a3a] text-base">
-          {badge.thumb}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12px] font-medium text-white">
-            {selected?.name ?? "Whole timeline"}
-          </span>
-          <span className="block text-[11px] text-[var(--text-muted)]">
-            {timecode(clipSeconds)} · {selected ? "selected" : "nothing selected"}
-          </span>
-        </span>
-        <span
-          className={`rounded-full px-[7px] py-0.5 text-[10px] font-semibold tracking-[0.3px] ${badge.className}`}
-        >
-          {badge.label}
+      {/*
+        Suggestions as one scrolling line rather than a block at the bottom.
+        Six of them stacked two-wide cost ninety vertical pixels that the
+        conversation wants more, and a row puts them where the eye already is
+        when the panel opens. overflow-x-auto keeps every chip reachable at
+        280px without wrapping; the scrollbar itself is hidden because a
+        horizontal bar under six pills reads as clutter, and the chips are
+        clipped mid-pill at the edge so it is obvious there are more.
+      */}
+      <div
+        className="capfree-chips flex shrink-0 gap-1.5 overflow-x-auto border-b border-[var(--border)] px-3.5 py-2.5"
+        // Inline rather than a class: hiding the bar is this row's own
+        // business, and a stylesheet rule for it has to survive the build to
+        // work -- when it does not, a 16px bar silently eats a third of the
+        // row's height. scrollbar-width is the standard property and modern
+        // Chromium honours it, so no vendor pseudo-element is needed.
+        style={{ scrollbarWidth: "none" }}
+      >
+        {QUICK_PROMPTS.map((quick) => (
+          <button
+            key={quick.label}
+            type="button"
+            disabled={busy}
+            onClick={() => void send(quick.prompt ?? quick.label)}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--bg-panel2)] px-2.5 py-1 text-[11.5px] text-[var(--text-muted)] transition-colors hover:border-[rgba(91,94,244,0.4)] hover:bg-[rgba(91,94,244,0.15)] hover:text-[#9b9ef8] disabled:opacity-40"
+          >
+            <span aria-hidden>{quick.icon}</span>
+            {quick.label}
+          </button>
+        ))}
+      </div>
+
+      {/* What the next prompt will act on, in one line */}
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-[var(--border)] px-3.5 py-1.5 text-[11px] text-[var(--text-muted)]">
+        <span aria-hidden>{badge.thumb}</span>
+        <span className="min-w-0 truncate">
+          {timecode(clipSeconds)} · {clipCount} clip{clipCount === 1 ? "" : "s"}
+          {selected ? ` · ${selected.name}` : ""}
         </span>
       </div>
 
@@ -252,8 +276,7 @@ export function AIPanel({ fps }: AIPanelProps) {
             <span className="text-[26px] leading-none" aria-hidden>
               ✨
             </span>
-            <p className="text-[13px] font-semibold text-white">CapFree AI</p>
-            <p className="text-[11.5px] leading-snug text-[var(--text-muted)]">
+            <p className="text-[12.5px] leading-snug text-[var(--text-muted)]">
               Describe an edit in plain words
             </p>
           </div>
@@ -324,27 +347,6 @@ export function AIPanel({ fps }: AIPanelProps) {
             <Thinking status={status ?? "Processing clip…"} />
           </div>
         )}
-      </div>
-
-      {/* Quick prompts */}
-      <div className="shrink-0 border-t border-[var(--border)] px-3.5 py-2.5">
-        <p className="mb-[7px] text-[11px] font-semibold uppercase tracking-[0.5px] text-[#555568]">
-          Try these
-        </p>
-        <div className="grid grid-cols-2 gap-[5px]">
-          {QUICK_PROMPTS.map((quick) => (
-            <button
-              key={quick.label}
-              type="button"
-              disabled={busy}
-              onClick={() => void send(quick.prompt ?? quick.label)}
-              className="rounded-[7px] border border-[var(--border)] bg-[var(--bg-panel2)] px-2.5 py-1.5 text-left text-[11.5px] leading-tight text-[var(--text-muted)] transition-colors hover:border-[var(--accent)] hover:bg-[rgba(91,94,244,0.15)] hover:text-white disabled:opacity-40"
-            >
-              <span className="mr-1">{quick.icon}</span>
-              {quick.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* What is left of today's allowance, where the eye lands before typing */}
