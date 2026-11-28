@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import subprocess
 import urllib.error
 import urllib.request
 import warnings
@@ -16,7 +17,7 @@ warnings.filterwarnings(
 )
 
 from fastapi import APIRouter, Form, Header, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from silence import check_auth
 
@@ -27,6 +28,57 @@ DEFAULT_MODEL_ID = "eleven_monolingual_v1"
 MAX_TEXT_CHARS = 5000  # monolingual v1 request limit
 _VOICE_ID = re.compile(r"^[A-Za-z0-9]{8,40}$")
 _MODEL_ID = re.compile(r"^[A-Za-z0-9_]{1,64}$")
+
+# Speed and pitch are not ElevenLabs parameters -- v1 has no pitch control at
+# all -- so they are applied afterwards with FFmpeg, which is already a
+# dependency here. Both at their defaults means no second pass and the MP3
+# streams straight through, which is the common case.
+SPEED_RANGE = (0.5, 2.0)
+PITCH_RANGE = (-5, 5)
+SHAPE_TIMEOUT_SEC = 120
+
+
+def _shape_filter(speed: float, pitch: int) -> Optional[str]:
+    """An FFmpeg filter chain for the requested speed and pitch, or None.
+
+    Pitch is shifted by resampling -- playing the audio at a different rate
+    moves pitch and tempo together -- and then undoing the tempo part with
+    atempo, which leaves the pitch moved and the length unchanged. Speed then
+    applies on top. atempo only accepts 0.5-2.0 per instance, which is exactly
+    the range offered, so one stage is always enough.
+    """
+    steps = []
+    if pitch:
+        # Twelve semitones to the octave, so each step is the twelfth root of 2.
+        ratio = 2 ** (pitch / 12)
+        steps.append(f"asetrate=44100*{ratio:.6f}")
+        steps.append("aresample=44100")
+        steps.append(f"atempo={1 / ratio:.6f}")
+    if abs(speed - 1.0) > 0.001:
+        steps.append(f"atempo={speed:.3f}")
+    return ",".join(steps) if steps else None
+
+
+def _reshape(mp3: bytes, chain: str) -> bytes:
+    """Re-encode the speech through `chain`. Raises if FFmpeg cannot."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-nostdin", "-y", "-i", "pipe:0", "-filter:a", chain,
+             "-f", "mp3", "-b:a", "128k", "pipe:1"],
+            input=mp3,
+            capture_output=True,
+            timeout=SHAPE_TIMEOUT_SEC,
+        )
+    except FileNotFoundError as err:
+        raise HTTPException(
+            500, "Speed and pitch need FFmpeg, which is not installed on the API host."
+        ) from err
+    except subprocess.TimeoutExpired as err:
+        raise HTTPException(504, "FFmpeg took too long shaping the speech.") from err
+    if result.returncode != 0 or not result.stdout:
+        tail = (result.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+        raise HTTPException(502, f"FFmpeg could not shape the speech: {tail[-1] if tail else 'no output'}")
+    return result.stdout
 
 
 def _validate(text: str, voice_id: str, model_id: str, stability: float, similarity_boost: float) -> str:
@@ -106,10 +158,21 @@ def tts(
     model_id: str = Form(DEFAULT_MODEL_ID),
     stability: float = Form(0.5),
     similarity_boost: float = Form(0.75),
+    speed: float = Form(1.0),
+    pitch: int = Form(0),
     x_api_key: Optional[str] = Header(None),
 ):
-    """Synthesize speech with ElevenLabs and stream the MP3 back."""
+    """Synthesize speech with ElevenLabs and stream the MP3 back.
+
+    `speed` and `pitch` are applied here rather than by ElevenLabs, which
+    offers neither on this model. At their defaults the audio is passed
+    through untouched.
+    """
     check_auth(x_api_key)
+    if not SPEED_RANGE[0] <= speed <= SPEED_RANGE[1]:
+        raise HTTPException(400, f"speed must be between {SPEED_RANGE[0]} and {SPEED_RANGE[1]}")
+    if not PITCH_RANGE[0] <= pitch <= PITCH_RANGE[1]:
+        raise HTTPException(400, f"pitch must be between {PITCH_RANGE[0]} and {PITCH_RANGE[1]}")
     text = _validate(text, voice_id, model_id, stability, similarity_boost)
     resp = _open_elevenlabs(text, voice_id, model_id, stability, similarity_boost)
 
@@ -119,8 +182,22 @@ def tts(
         resp.close()
         raise HTTPException(502, f"ElevenLabs returned an unexpected response: {' '.join(body.split())[:240]}")
 
-    return StreamingResponse(
-        _iter_mp3(resp),
+    chain = _shape_filter(speed, pitch)
+    if chain is None:
+        return StreamingResponse(
+            _iter_mp3(resp),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": 'attachment; filename="speech.mp3"'},
+        )
+
+    # Shaping needs the whole file, so this one is read before it is answered.
+    # Speech is seconds long, not minutes, so holding it is cheap.
+    try:
+        original = b"".join(_iter_mp3(resp))
+    finally:
+        resp.close()
+    return Response(
+        _reshape(original, chain),
         media_type="audio/mpeg",
         headers={"Content-Disposition": 'attachment; filename="speech.mp3"'},
     )

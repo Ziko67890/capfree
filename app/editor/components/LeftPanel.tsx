@@ -22,6 +22,7 @@ import { TextPanel } from "./panels/TextPanel";
 import { TranscriptPanel } from "./panels/TranscriptPanel";
 import { TransitionsPanel } from "./panels/TransitionsPanel";
 import { TranslatePanel } from "./panels/TranslatePanel";
+import { TTSPanel } from "./panels/TTSPanel";
 import { VocalSplitPanel } from "./panels/VocalSplitPanel";
 
 interface LeftPanelProps {
@@ -75,6 +76,7 @@ export function LeftPanel({ tab, fps, onAssetActivate }: LeftPanelProps) {
       <Pane active={tab === "reframe"}><ReframePanel active={tab === "reframe"} /></Pane>
       <Pane active={tab === "highlights"}><HighlightsPanel fps={fps} /></Pane>
       <Pane active={tab === "translate"}><TranslatePanel fps={fps} /></Pane>
+      <Pane active={tab === "tts"}><TTSPanel /></Pane>
       <Pane active={tab === "aitools"}><AIToolsPanel fps={fps} /></Pane>
       <ToastDock />
     </aside>

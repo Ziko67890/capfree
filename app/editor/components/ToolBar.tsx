@@ -9,6 +9,7 @@ import {
   Disc3,
   FileText,
   Film,
+  AudioLines,
   Globe,
   LayoutTemplate,
   Mic,
@@ -42,6 +43,7 @@ export type EditorTab =
   | "reframe"
   | "highlights"
   | "translate"
+  | "tts"
   | "aitools";
 
 const TABS: Array<{ id: EditorTab; label: string; icon: LucideIcon; exclusive?: boolean }> = [
@@ -63,6 +65,7 @@ const TABS: Array<{ id: EditorTab; label: string; icon: LucideIcon; exclusive?: 
   { id: "reframe", label: "Reframe", icon: Crop, exclusive: true },
   { id: "highlights", label: "Highlights", icon: Star, exclusive: true },
   { id: "translate", label: "Translate", icon: Globe, exclusive: true },
+  { id: "tts", label: "Voiceover", icon: AudioLines, exclusive: true },
   { id: "aitools", label: "AI Tools", icon: Wand2, exclusive: true },
 ];
 

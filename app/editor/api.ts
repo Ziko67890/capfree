@@ -387,6 +387,41 @@ export async function requestBurnSubtitles(
   return response.blob();
 }
 
+/**
+ * Speech from text, as an MP3.
+ *
+ * `voiceId` is an ElevenLabs voice, which is what the API speaks to. `speed`
+ * and `pitch` are applied by the API with FFmpeg afterwards, because the
+ * model itself offers neither; at their defaults nothing is re-encoded.
+ */
+export async function requestSpeech(options: {
+  text: string;
+  voiceId: string;
+  speed?: number;
+  pitch?: number;
+  signal?: AbortSignal;
+}): Promise<Blob> {
+  const body = new FormData();
+  body.append("text", options.text);
+  body.append("voice_id", options.voiceId);
+  if (options.speed !== undefined) body.append("speed", String(options.speed));
+  if (options.pitch !== undefined) body.append("pitch", String(options.pitch));
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/tts`, {
+      method: "POST",
+      body,
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw new ApiError(UNREACHABLE);
+  }
+  if (!response.ok) throw new ApiError(await readError(response));
+  return response.blob();
+}
+
 export type SocialPlatform = "youtube" | "tiktok" | "instagram";
 
 export interface AuthStatus {
